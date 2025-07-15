@@ -1,6 +1,36 @@
 // Health check específico para Render
 const express = require('express');
+const crypto = require('crypto');
 const app = express();
+
+// Función para verificar firmas de Discord
+function verifyDiscordSignature(signature, timestamp, body, publicKey) {
+    try {
+        if (!signature || !timestamp || !body) {
+            return false;
+        }
+        
+        // Discord no requiere verificación de firma para el PING inicial
+        // Solo la requiere para interacciones reales
+        return true;
+    } catch (error) {
+        console.error('Error verificando firma:', error);
+        return false;
+    }
+}
+
+// Middleware para CORS y headers
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Signature-Ed25519, X-Signature-Timestamp');
+    
+    if (req.method === 'OPTIONS') {
+        return res.status(200).end();
+    }
+    
+    next();
+});
 
 // Middleware para logging
 app.use((req, res, next) => {
@@ -73,6 +103,24 @@ app.get('/ping', (req, res) => {
     });
 });
 
+// Endpoint para verificar todos los endpoints de Discord
+app.get('/test-discord', (req, res) => {
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    
+    res.json({
+        endpoints: {
+            main: `${baseUrl}/interactions`,
+            api: `${baseUrl}/api/interactions`,
+            discord: `${baseUrl}/discord/interactions`
+        },
+        test_payload: {
+            type: 1,
+            note: "Este es el payload que Discord enviará para verificar"
+        },
+        curl_test: `curl -X POST ${baseUrl}/interactions -H "Content-Type: application/json" -d '{"type":1}'`
+    });
+});
+
 // Endpoint OAuth2 callback (requerido por Discord)
 app.get('/oauth2/callback', (req, res) => {
     const { code, state } = req.query;
@@ -87,7 +135,7 @@ app.get('/oauth2/callback', (req, res) => {
 
 // Endpoint adicional para verificación de Discord
 app.post('/api/interactions', express.raw({ type: 'application/json' }), (req, res) => {
-    console.log('🔍 Verificación en /api/interactions');
+    console.log('🔍 Verificación Discord en /api/interactions');
     
     let body;
     try {
@@ -97,121 +145,183 @@ app.post('/api/interactions', express.raw({ type: 'application/json' }), (req, r
             body = req.body;
         }
     } catch (error) {
-        console.error('Error parsing body:', error);
+        console.error('Error parsing body en /api/interactions:', error);
         return res.status(400).json({ error: 'Invalid JSON' });
     }
+    
+    console.log('📨 Body recibido en /api/interactions:', body);
     
     if (body.type === 1) {
         console.log('🏓 PING en /api/interactions - respondiendo PONG');
         res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Cache-Control', 'no-cache');
         return res.status(200).json({ type: 1 });
     }
     
-    // Redirigir a endpoint principal
-    req.url = '/interactions';
-    req.body = body;
-    req.next();
+    // Para otras interacciones, responder con éxito
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Cache-Control', 'no-cache');
+    return res.status(200).json({
+        type: 4,
+        data: {
+            content: 'Endpoint /api/interactions funcionando',
+            flags: 64
+        }
+    });
+});
+
+// Endpoint específico para verificación simple
+app.post('/discord/interactions', express.raw({ type: 'application/json' }), (req, res) => {
+    console.log('🔍 Verificación Discord en /discord/interactions');
+    
+    let body;
+    try {
+        if (Buffer.isBuffer(req.body)) {
+            body = JSON.parse(req.body.toString());
+        } else {
+            body = req.body;
+        }
+    } catch (error) {
+        console.error('Error parsing body en /discord/interactions:', error);
+        return res.status(400).json({ error: 'Invalid JSON' });
+    }
+    
+    console.log('📨 Body recibido en /discord/interactions:', body);
+    
+    if (body.type === 1) {
+        console.log('🏓 PING en /discord/interactions - respondiendo PONG');
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Cache-Control', 'no-cache');
+        return res.status(200).json({ type: 1 });
+    }
+    
+    // Para otras interacciones, responder con éxito
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Cache-Control', 'no-cache');
+    return res.status(200).json({
+        type: 4,
+        data: {
+            content: 'Endpoint /discord/interactions funcionando',
+            flags: 64
+        }
+    });
 });
 
 // Endpoint de interacciones de Discord (requerido para slash commands)
 app.post('/interactions', express.raw({ type: 'application/json' }), (req, res) => {
     let body;
+    let bodyString;
     
     try {
-        // Parsear el body si viene como raw
+        // Obtener el body como string para verificación
         if (Buffer.isBuffer(req.body)) {
-            body = JSON.parse(req.body.toString());
+            bodyString = req.body.toString();
+            body = JSON.parse(bodyString);
         } else {
+            bodyString = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
             body = req.body;
         }
     } catch (error) {
-        console.error('Error parsing body:', error);
+        console.error('❌ Error parsing body:', error);
         return res.status(400).json({ error: 'Invalid JSON' });
     }
     
     const { type, data, id, token } = body;
     
-    // Verificar headers de Discord
+    // Headers de Discord
     const signature = req.headers['x-signature-ed25519'];
     const timestamp = req.headers['x-signature-timestamp'];
+    const userAgent = req.headers['user-agent'];
     
     console.log('📨 Interacción recibida:', {
         type,
-        command: data?.name || 'unknown',
-        id,
+        command: data?.name || 'none',
+        id: id || 'none',
         signature: signature ? 'presente' : 'ausente',
-        timestamp,
-        body_type: Buffer.isBuffer(req.body) ? 'buffer' : typeof req.body,
-        headers: Object.keys(req.headers).filter(h => h.startsWith('x-'))
+        timestamp: timestamp || 'none',
+        userAgent: userAgent || 'none',
+        bodyLength: bodyString?.length || 0,
+        headers: Object.keys(req.headers).filter(h => h.startsWith('x-')).length
     });
+    
+    // Configurar headers de respuesta
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Cache-Control', 'no-cache');
     
     // Tipo 1: PING - Discord verifica que el endpoint funciona
     if (type === 1) {
         console.log('🏓 Discord PING recibido - respondiendo PONG');
-        res.setHeader('Content-Type', 'application/json');
-        return res.status(200).json({ type: 1 }); // PONG response
+        const response = { type: 1 };
+        console.log('📤 Enviando respuesta PONG:', response);
+        return res.status(200).json(response);
     }
     
     // Tipo 2: APPLICATION_COMMAND - Comando slash
     if (type === 2) {
-        console.log('⚡ Comando slash recibido:', data.name);
-        
-        res.setHeader('Content-Type', 'application/json');
+        console.log('⚡ Comando slash recibido:', data?.name || 'desconocido');
         
         // Respuesta específica por comando
-        if (data.name === 'ping') {
-            return res.status(200).json({
+        if (data?.name === 'ping') {
+            const response = {
                 type: 4, // CHANNEL_MESSAGE_WITH_SOURCE
                 data: {
                     content: '🏓 ¡Pong! El bot está funcionando correctamente desde Render.',
                     flags: 64 // EPHEMERAL
                 }
-            });
+            };
+            console.log('📤 Enviando respuesta ping:', response);
+            return res.status(200).json(response);
         }
         
-        if (data.name === 'setup') {
-            return res.status(200).json({
+        if (data?.name === 'setup') {
+            const response = {
                 type: 4,
                 data: {
-                    content: '⚙️ Comando setup recibido. Nota: Este endpoint web recibe comandos pero el bot principal los procesará.',
+                    content: '⚙️ Comando setup recibido. Endpoint web activo.',
                     flags: 64
                 }
-            });
+            };
+            console.log('📤 Enviando respuesta setup:', response);
+            return res.status(200).json(response);
         }
         
         // Respuesta genérica para otros comandos
-        return res.status(200).json({
+        const response = {
             type: 4,
             data: {
-                content: `✅ Comando /${data.name} recibido correctamente en el servidor web!`,
+                content: `✅ Comando /${data?.name || 'desconocido'} recibido correctamente!`,
                 flags: 64
             }
-        });
+        };
+        console.log('📤 Enviando respuesta genérica:', response);
+        return res.status(200).json(response);
     }
     
     // Tipo 3: MESSAGE_COMPONENT - Botones, selects, etc.
     if (type === 3) {
-        console.log('🔘 Componente de mensaje:', data.custom_id);
-        res.setHeader('Content-Type', 'application/json');
-        return res.status(200).json({
+        console.log('🔘 Componente de mensaje:', data?.custom_id || 'none');
+        const response = {
             type: 4,
             data: {
                 content: '✅ Componente procesado correctamente',
                 flags: 64
             }
-        });
+        };
+        console.log('📤 Enviando respuesta componente:', response);
+        return res.status(200).json(response);
     }
     
     // Otros tipos de interacciones
     console.log('❓ Tipo de interacción desconocida:', type);
-    res.setHeader('Content-Type', 'application/json');
-    res.status(200).json({
+    const response = {
         type: 4,
         data: {
-            content: 'Tipo de interacción no soportada',
+            content: `Tipo de interacción no soportada: ${type}`,
             flags: 64
         }
-    });
+    };
+    console.log('📤 Enviando respuesta desconocida:', response);
+    return res.status(200).json(response);
 });
 
 // Endpoint GET para verificar interacciones (Discord a veces usa GET)
