@@ -64,66 +64,14 @@ const client = new Client({
         GatewayIntentBits.GuildMessageReactions,
         GatewayIntentBits.GuildIntegrations
     ],
-    // Configuraciones específicas para Render
+    // Configuración mínima para debugging
     ws: {
         compress: false,
-        large_threshold: 50,
-        version: 10,
-        properties: {
-            $browser: 'discord.js',
-            $device: 'discord.js',
-            $os: process.platform
-        },
-        // Configuraciones específicas para entornos de hosting
-        family: 'ipv4',
-        localAddress: undefined,
-        // Configuraciones de WebSocket para Render
-        handshakeTimeout: 30000,
-        closeTimeout: 30000,
-        skipUTF8Validation: false
+        large_threshold: 50
     },
-    // Configuraciones de REST API más agresivas
     rest: {
-        timeout: 30000,
-        retries: 3,
-        rejectOnRateLimit: false,
-        userAgentSuffix: ['LanaMusic-Bot/1.0'],
-        // Configuraciones específicas para Render
-        api: 'https://discord.com/api',
-        cdn: 'https://cdn.discordapp.com',
-        invite: 'https://discord.gg',
-        template: 'https://discord.new',
-        scheduledEvent: 'https://discord.com/events',
-        // Headers adicionales
-        headers: {
-            'User-Agent': 'LanaMusic-Bot/1.0 (https://github.com/TomGGB/discord-music-bot)'
-        }
-    },
-    // Configuraciones adicionales para Render
-    restRequestTimeout: 30000,
-    restSweepInterval: 60,
-    restTimeOffset: 500,
-    restGlobalTimeout: 30000,
-    // Configuración de proxy si está disponible
-    proxy: process.env.HTTP_PROXY || process.env.HTTPS_PROXY || undefined,
-    // Configuraciones de conexión específicas
-    shards: 'auto',
-    shardCount: 1,
-    // Configuraciones de caché optimizadas
-    makeCache: require('discord.js').Options.cacheWithLimits({
-        MessageManager: 100,
-        ChannelManager: 100,
-        GuildManager: 100,
-        UserManager: 100,
-        GuildMemberManager: 100
-    }),
-    // Configuraciones de presence
-    presence: {
-        status: 'online',
-        activities: [{
-            name: 'música 🎵',
-            type: 2 // LISTENING
-        }]
+        timeout: 15000,
+        retries: 3
     }
 });
 
@@ -1118,6 +1066,63 @@ setTimeout(() => {
 // Hacer el client globalmente accesible para keep-alive
 global.client = client;
 
+// Agregar listeners para debugging detallado
+client.on('debug', (info) => {
+    if (info.includes('Sending a heartbeat') || info.includes('Heartbeat acknowledged')) {
+        // Silenciar heartbeats para no spam
+        return;
+    }
+    console.log('🔧 DEBUG:', info);
+});
+
+client.on('warn', (warning) => {
+    console.log('⚠️ WARNING:', warning);
+});
+
+client.on('error', (error) => {
+    console.error('❌ CLIENT ERROR:', error);
+    if (process.env.NODE_ENV === 'production') {
+        const { addError } = require('./render-health');
+        addError(error);
+    }
+});
+
+client.on('disconnect', (closeEvent) => {
+    console.log('🔌 DISCONNECT:', closeEvent);
+    if (process.env.NODE_ENV === 'production') {
+        const { setBotStatus } = require('./render-health');
+        setBotStatus({ connected: false, ready: false });
+    }
+});
+
+client.on('reconnecting', () => {
+    console.log('🔄 RECONNECTING...');
+});
+
+client.on('resumed', () => {
+    console.log('✅ RESUMED connection');
+});
+
+client.on('shardDisconnect', (closeEvent, shardId) => {
+    console.log(`🔌 SHARD ${shardId} DISCONNECT:`, closeEvent);
+});
+
+client.on('shardReconnecting', (shardId) => {
+    console.log(`🔄 SHARD ${shardId} RECONNECTING...`);
+});
+
+client.on('shardResumed', (shardId) => {
+    console.log(`✅ SHARD ${shardId} RESUMED`);
+});
+
+client.on('shardError', (error, shardId) => {
+    console.error(`❌ SHARD ${shardId} ERROR:`, error);
+});
+
+client.on('shardReady', (shardId) => {
+    console.log(`✅ SHARD ${shardId} READY`);
+});
+
 // Función para conectar con reintentos mejorada
 async function connectToDiscord(retries = 5) {
     console.log(`🔌 Intento de conexión ${6 - retries}/5...`);
@@ -1148,6 +1153,26 @@ async function connectToDiscord(retries = 5) {
         }
         
         console.log('🔑 Iniciando proceso de login...');
+        console.log('🔍 Información del cliente:');
+        console.log('   - Intents configurados:', client.options.intents);
+        console.log('   - WebSocket configurado:', !!client.options.ws);
+        console.log('   - REST configurado:', !!client.options.rest);
+        console.log('   - Timeout de REST:', client.options.rest.timeout);
+        console.log('   - Reintentos de REST:', client.options.rest.retries);
+        
+        console.log('🌐 Información del entorno:');
+        console.log('   - NODE_ENV:', process.env.NODE_ENV);
+        console.log('   - Platform:', process.platform);
+        console.log('   - Node version:', process.version);
+        console.log('   - Discord.js version:', require('discord.js').version);
+        
+        console.log('🔑 Información del token:');
+        console.log('   - Token length:', token.length);
+        console.log('   - Token prefix:', token.substring(0, 10) + '...');
+        console.log('   - Token parts:', token.split('.').length);
+        
+        console.log('🚀 Iniciando login con timeout de 30 segundos...');
+        
         await Promise.race([
             client.login(process.env.DISCORD_TOKEN),
             loginTimeout
