@@ -93,13 +93,18 @@ const client = new Client({
     // Configuraciones de conexión específicas para Render
     shards: 'auto',
     shardCount: 1,
-    // Configuraciones de caché muy limitadas para Render
+    // Configuraciones de caché más simples para evitar warnings
     makeCache: require('discord.js').Options.cacheWithLimits({
-        MessageManager: 50,
-        ChannelManager: 50,
-        GuildManager: 50,
-        UserManager: 50,
-        GuildMemberManager: 50
+        MessageManager: {
+            maxSize: 50,
+            keepOverLimit: item => item.author.id === client.user.id
+        },
+        GuildManager: {
+            maxSize: 50
+        },
+        UserManager: {
+            maxSize: 50
+        }
     }),
     // Configuración de presence simple
     presence: {
@@ -1164,14 +1169,9 @@ client.on('shardReady', (shardId) => {
     console.log(`✅ SHARD ${shardId} READY`);
 });
 
-// Función para conectar con reintentos mejorada para Render
+// Función para conectar con estrategia específica para Render
 async function connectToDiscord(retries = 3) {
     console.log(`🔌 Intento de conexión ${4 - retries}/3...`);
-    
-    // Timeout más largo para Render (60 segundos por intento)
-    const loginTimeout = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('LOGIN_TIMEOUT')), 60000);
-    });
     
     try {
         // Iniciar keep-alive ANTES del login en producción
@@ -1194,17 +1194,6 @@ async function connectToDiscord(retries = 3) {
                 console.log('❌ Bot ERROR - Registrando en health server:', error.message);
                 addError(error);
             });
-            
-            // Eventos específicos para debugging de conexión
-            client.on('debug', (info) => {
-                if (info.includes('Identifying') || info.includes('Connecting') || info.includes('Authenticated')) {
-                    console.log('🔧 CONNECTION DEBUG:', info);
-                }
-            });
-            
-            client.on('warn', (warning) => {
-                console.log('⚠️ CONNECTION WARNING:', warning);
-            });
         }
         
         console.log('🔑 Iniciando proceso de login...');
@@ -1225,68 +1214,81 @@ async function connectToDiscord(retries = 3) {
         console.log('   - Token prefix:', token.substring(0, 10) + '...');
         console.log('   - Token parts:', token.split('.').length);
         
-        console.log('🚀 Iniciando login con timeout de 60 segundos...');
+        // Estrategia alternativa: Intentar conexión sin timeout personalizado
+        console.log('🚀 Estrategia de conexión para Render - Sin timeout personalizado');
         
-        // Intentar conexión con configuración específica para Render
-        await Promise.race([
-            client.login(process.env.DISCORD_TOKEN),
-            loginTimeout
-        ]);
+        const loginPromise = client.login(process.env.DISCORD_TOKEN);
         
-        console.log('✅ Sesión iniciada correctamente');
-        console.log('🎯 Bot conectado exitosamente a Discord');
-        
-        // Esperar a que el bot esté completamente listo
-        if (!client.isReady()) {
-            console.log('⏳ Esperando a que el bot esté completamente listo...');
-            await new Promise((resolve) => {
-                client.once('ready', resolve);
+        // Esperar a que el cliente esté listo
+        const readyPromise = new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => {
+                reject(new Error('READY_TIMEOUT'));
+            }, 120000); // 2 minutos para estar listo
+            
+            client.once('ready', () => {
+                clearTimeout(timeout);
+                resolve();
             });
-        }
+            
+            client.once('error', (error) => {
+                clearTimeout(timeout);
+                reject(error);
+            });
+        });
         
+        // Esperar tanto el login como que esté listo
+        await loginPromise;
+        console.log('✅ Login exitoso, esperando estado ready...');
+        
+        await readyPromise;
         console.log('🎉 Bot completamente listo y operativo');
         
     } catch (error) {
-        console.error('❌ Error al iniciar sesión:', error.message);
+        console.error('❌ Error al conectar:', error.message);
         console.error('🔍 Código de error:', error.code);
         console.error('🔍 Tipo de error:', error.name);
         
         // Análisis específico del error
         if (error.code === 'INVALID_TOKEN') {
-            console.error('🚨 TOKEN INVÁLIDO: Regenerar token en Discord Developer Portal');
+            console.error('🚨 TOKEN INVÁLIDO');
+            console.error('   1. Ve a Discord Developer Portal');
+            console.error('   2. Regenera el token');
+            console.error('   3. Actualiza DISCORD_TOKEN en Render');
             process.exit(1);
         } else if (error.code === 'DISALLOWED_INTENTS') {
-            console.error('🚨 INTENTS NO PERMITIDOS: Activar Privileged Gateway Intents');
+            console.error('🚨 INTENTS NO PERMITIDOS');
+            console.error('   1. Ve a Discord Developer Portal');
+            console.error('   2. Bot → Privileged Gateway Intents');
+            console.error('   3. Activa PRESENCE, SERVER MEMBERS, MESSAGE CONTENT');
             process.exit(1);
-        } else if (error.code === 'RATE_LIMITED') {
-            console.error('🚨 RATE LIMITED: Esperando más tiempo...');
-            await new Promise(resolve => setTimeout(resolve, 120000)); // 2 minutos
-        } else if (error.message === 'LOGIN_TIMEOUT') {
-            console.error('⏱️ TIMEOUT: El login tardó más de 60 segundos');
-            console.error('🔧 Esto es común en Render - reintentando...');
+        } else if (error.message === 'READY_TIMEOUT') {
+            console.error('⏱️ TIMEOUT: Bot no llegó a estado ready en 2 minutos');
         } else {
             console.error('🔍 Error desconocido:', error);
         }
         
         // Reintentar con backoff exponencial
         if (retries > 0) {
-            const waitTime = Math.pow(2, 4 - retries) * 15000; // 15s, 30s, 60s
+            const waitTime = Math.pow(2, 4 - retries) * 30000; // 30s, 60s, 120s
             console.log(`🔄 Reintentando en ${waitTime/1000} segundos... (${retries} intentos restantes)`);
+            
+            // Destruir cliente anterior si existe
+            if (client.isReady()) {
+                await client.destroy();
+            }
+            
             await new Promise(resolve => setTimeout(resolve, waitTime));
             return connectToDiscord(retries - 1);
         } else {
             console.error('❌ Se agotaron los intentos de conexión');
-            console.error('🔧 Manteniendo servidor activo para diagnóstico...');
             
-            // En producción, mantener el servidor activo pero reintentar periódicamente
+            // En producción, mantener el servidor activo
             if (process.env.NODE_ENV === 'production') {
-                console.log('🔄 Programando reintentos automáticos cada 10 minutos...');
+                console.log('🔄 Manteniendo servidor activo - Reintentos cada 15 minutos');
                 setInterval(() => {
-                    if (!client.isReady()) {
-                        console.log('🔄 Reintento automático de conexión...');
-                        connectToDiscord(1); // Solo 1 intento en reconexión automática
-                    }
-                }, 600000); // 10 minutos
+                    console.log('🔄 Reintento automático de conexión...');
+                    connectToDiscord(1);
+                }, 900000); // 15 minutos
             } else {
                 process.exit(1);
             }
