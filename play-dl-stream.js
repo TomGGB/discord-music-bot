@@ -6,6 +6,7 @@ const ytdlDiscord = require('ytdl-core-discord');
 const { PassThrough } = require('stream');
 const ffmpegPath = require('ffmpeg-static');
 const { spawn } = require('child_process');
+const fs = require('fs');
 
 // Configuración específica para Render
 const isRender = process.env.RENDER === 'true' || process.env.IS_RENDER === 'true';
@@ -546,82 +547,52 @@ async function createStreamWithYtdlDiscord(url) {
  */
 async function createStreamWithYtdl(url) {
     try {
-        console.log('🔧 Intentando crear stream con ytdl-core...');
-        
-        // Verificar si la URL es válida para YouTube
+        console.log('🔧 Intentando crear stream con ytdl-core como método principal...');
+
+        // Verificar si la URL es válida
         if (!ytdl.validateURL(url)) {
             throw new Error('URL de YouTube inválida');
         }
-        
-        // Extraer el ID del video para usar una URL limpia
-        let videoId = '';
-        if (url.includes('youtube.com/watch?v=')) {
-            videoId = url.split('v=')[1];
-            if (videoId.includes('&')) {
-                videoId = videoId.split('&')[0];
-            }
-        } else if (url.includes('youtu.be/')) {
-            videoId = url.split('youtu.be/')[1];
-            if (videoId.includes('?')) {
-                videoId = videoId.split('?')[0];
-            }
-        }
-        
-        if (!videoId) {
-            throw new Error('No se pudo extraer el ID del video de YouTube');
-        }
-        
-        // Construir una URL limpia
-        const cleanUrl = `https://www.youtube.com/watch?v=${videoId}`;
-        console.log('🔍 URL limpia para ytdl-core:', cleanUrl);
-        
-        // Obtener información del video primero para verificar disponibilidad
-        console.log('🔍 Obteniendo información del video con ytdl-core...');
-        const info = await ytdl.getInfo(cleanUrl).catch(err => {
-            console.error('❌ Error al obtener información del video:', err.message);
-            throw new Error(`No se pudo obtener información del video: ${err.message}`);
-        });
-        
+
+        // Obtener información básica del video
+        const info = await ytdl.getInfo(url);
         console.log(`✅ Información obtenida para: ${info.videoDetails.title}`);
-        
+
         // Crear un PassThrough para mayor estabilidad
         const passthrough = new PassThrough({
             highWaterMark: 1 << 25 // Buffer grande (~32MB)
         });
-        
+
         // Obtener stream con ytdl-core con opciones optimizadas
         console.log('🔄 Descargando audio con ytdl-core...');
         const stream = ytdl.downloadFromInfo(info, {
             filter: 'audioonly',
             quality: 'highestaudio',
-            highWaterMark: 1 << 25, // ~32MB buffer
-            dlChunkSize: 0, // Descargar en un solo chunk
+            highWaterMark: 1 << 25
         });
-        
+
         // Conectar el stream al PassThrough
         stream.pipe(passthrough);
-        
+
         // Manejar errores
         stream.on('error', (error) => {
             console.error('❌ Error en ytdl-core stream:', error.message);
             passthrough.destroy(error);
         });
-        
+
         // Manejar eventos de progreso para debugging
-        if (isRender) {
-            stream.on('progress', (chunkLength, downloaded, total) => {
-                const percent = downloaded / total * 100;
-                console.log(`🔄 Progreso de descarga: ${percent.toFixed(2)}% (${(downloaded / 1024 / 1024).toFixed(2)}MB de ${(total / 1024 / 1024).toFixed(2)}MB)`);
-            });
-        }
-        
+        stream.on('progress', (chunkLength, downloaded, total) => {
+            const percent = downloaded / total * 100;
+            console.log(`🔄 Progreso de descarga: ${percent.toFixed(2)}% (${(downloaded / 1024 / 1024).toFixed(2)}MB de ${(total / 1024 / 1024).toFixed(2)}MB)`);
+        });
+
         // Manejar fin de stream
         stream.on('end', () => {
             console.log('✅ Descarga de audio completada');
         });
-        
+
         console.log('✅ Stream obtenido con ytdl-core');
-        
+
         // Devolver un objeto similar al que devuelve play.stream()
         return {
             stream: passthrough,
@@ -629,19 +600,7 @@ async function createStreamWithYtdl(url) {
         };
     } catch (error) {
         console.error('❌ Error con ytdl-core:', error.message);
-        
-        // Si estamos en Render y ytdl-core falla, intentar con FFmpeg como último recurso
-        if (isRender) {
-            console.log('🔄 Intentando método alternativo con FFmpeg como último recurso...');
-            try {
-                return await createStreamWithPlayDlAndFfmpeg(url);
-            } catch (ffmpegError) {
-                console.error('❌ Error con FFmpeg:', ffmpegError.message);
-                throw ffmpegError;
-            }
-        } else {
-            throw error;
-        }
+        throw error;
     }
 }
 
@@ -650,5 +609,5 @@ module.exports = {
     createStreamWithYtdlDiscord,
     createStreamWithYtdl,
     createStreamWithPlayDlAndFfmpeg,
-    createAudioResourceFromUrl
+    createAudioResourceFromUrl,
 };
