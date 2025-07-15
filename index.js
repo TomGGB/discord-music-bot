@@ -61,7 +61,8 @@ const client = new Client({
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildVoiceStates,
-        GatewayIntentBits.GuildMessageReactions
+        GatewayIntentBits.GuildMessageReactions,
+        GatewayIntentBits.GuildIntegrations
     ]
 });
 
@@ -1035,6 +1036,10 @@ if (!token.includes('.') || token.split('.').length !== 3) {
 
 console.log('✅ Token tiene formato válido');
 
+// Agregar más logging específico
+console.log('🔌 Intentando conectar a Discord...');
+console.log('🔑 Token empieza con:', process.env.DISCORD_TOKEN.substring(0, 20) + '...');
+
 // Timeout para el evento ready
 setTimeout(() => {
     if (!client.user) {
@@ -1043,6 +1048,7 @@ setTimeout(() => {
         console.error('   - Token inválido o revocado');
         console.error('   - Problemas de conectividad');
         console.error('   - Bot deshabilitado en Discord Developer Portal');
+        console.error('   - Intents incorrectos');
         process.exit(1);
     }
 }, 30000);
@@ -1059,7 +1065,18 @@ client.login(process.env.DISCORD_TOKEN)
     })
     .catch(error => {
         console.error('❌ Error al iniciar sesión:', error.message);
-        console.error('🔍 Detalles del error:', error);
+        console.error('🔍 Código de error:', error.code);
+        console.error('🔍 Detalles completos:', error);
+        
+        // Errores comunes
+        if (error.code === 'INVALID_TOKEN') {
+            console.error('🚨 TOKEN INVÁLIDO: Verifica tu token en Discord Developer Portal');
+        } else if (error.code === 'DISALLOWED_INTENTS') {
+            console.error('🚨 INTENTS NO PERMITIDOS: Habilita los intents en Discord Developer Portal');
+        } else if (error.code === 'RATE_LIMITED') {
+            console.error('🚨 RATE LIMITED: Demasiadas conexiones, espera un momento');
+        }
+        
         process.exit(1);
     });
 
