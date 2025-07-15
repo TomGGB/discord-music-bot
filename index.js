@@ -22,6 +22,7 @@ const { spawn } = require('child_process');
 const { PassThrough } = require('stream');
 const ffmpegPath = require('ffmpeg-static');
 const ytdl = require('ytdl-core');
+const fs = require('fs');
 
 // Configurar Spotify API
 const spotifyApi = new SpotifyWebApi({
@@ -2082,6 +2083,7 @@ async function processSpotifyPlaylistNative(playlistId, message, voiceChannel) {
                 try {
                     await errorMessage.delete();
                 } catch (error) {
+
                     console.log('No se pudo eliminar el mensaje de error:', error.message);
                 }
             }, 3000);
@@ -2671,7 +2673,7 @@ const userAgents = [
 
 async function createStreamWithYtdlCore(url, retryCount = 3) {
     try {
-        console.log('🔧 Intentando crear stream con ytdl-core con User-Agent rotativo...');
+        console.log('🔧 Intentando crear stream con ytdl-core con User-Agent y cookies...');
 
         // Verificar si la URL es válida
         if (!ytdl.validateURL(url)) {
@@ -2681,10 +2683,20 @@ async function createStreamWithYtdlCore(url, retryCount = 3) {
         // Seleccionar un User-Agent aleatorio
         const userAgent = userAgents[Math.floor(Math.random() * userAgents.length)];
 
-        // Configurar opciones de solicitud con User-Agent personalizado
+        // Leer cookies desde un archivo
+        const cookiesPath = './cookies.txt';
+        let cookies = '';
+        if (fs.existsSync(cookiesPath)) {
+            cookies = fs.readFileSync(cookiesPath, 'utf8');
+        } else {
+            console.warn('⚠️ Archivo de cookies no encontrado. Algunas funciones pueden no funcionar correctamente.');
+        }
+
+        // Configurar opciones de solicitud con User-Agent y cookies
         const requestOptions = {
             headers: {
-                'User-Agent': userAgent
+                'User-Agent': userAgent,
+                'Cookie': cookies
             }
         };
 
