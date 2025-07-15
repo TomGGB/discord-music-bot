@@ -76,7 +76,7 @@ const resource = createAudioResource(stream, {
 ## Requisitos
 
 - Dependencia `play-dl` instalada
-- Dependencia `@discordjs/opus` instalada
+- Dependencia `@discordjs/opus` instalada (con fallback a `opusscript`)
 - FFmpeg disponible (a través de `ffmpeg-static`)
 
 ## Notas Adicionales
