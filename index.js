@@ -808,7 +808,10 @@ client.on('ready', async () => {
     console.log(`${config.messages.botConnected} ${client.user.tag}`);
     console.log('🎮 Bot listo y conectado a Discord');
     
-    // Registrar comandos slash
+    // Pequeño retraso para asegurar que todo esté completamente inicializado
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Registrar comandos slash (ahora que el bot está listo)
     await registerSlashCommands();
     
     // Obtener token de Spotify
@@ -937,6 +940,12 @@ client.on('interactionCreate', async (interaction) => {
 
 // Función para registrar comandos slash
 async function registerSlashCommands() {
+    // Verificar que el cliente esté listo
+    if (!client.user || !client.user.id) {
+        console.log('⚠️ Cliente no está listo, esperando...');
+        return;
+    }
+
     const commands = [
         {
             name: 'setup',
@@ -958,6 +967,7 @@ async function registerSlashCommands() {
 
     try {
         console.log('🔧 Registrando comandos slash...');
+        console.log('📋 Cliente ID:', client.user.id);
         
         await rest.put(
             Routes.applicationCommands(client.user.id),
