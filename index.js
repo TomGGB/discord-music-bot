@@ -64,35 +64,27 @@ const client = new Client({
         GatewayIntentBits.GuildMessageReactions,
         GatewayIntentBits.GuildIntegrations
     ],
-    // Configuración específica para Render (networking restrictivo)
+    // Configuración específica para Render (optimizada)
     ws: {
-        compress: false,
-        large_threshold: 50,
-        properties: {
-            $browser: 'discord.js',
-            $device: 'discord.js',
-            $os: 'linux'
-        },
-        // Configuraciones críticas para Render
-        handshakeTimeout: 45000,
-        closeTimeout: 45000
+        compression: 'zlib-stream',
+        connectionTimeout: 30000,
+        handshakeTimeout: 30000,
+        heartbeatInterval: 41250,
+        identifyTimeout: 5000,
+        version: 10,
+        encoding: 'json'
     },
+    // Configuración de REST API
     rest: {
-        timeout: 45000,
+        timeout: 30000,
         retries: 5,
-        rejectOnRateLimit: false,
-        userAgentSuffix: ['LanaMusic-Bot-Render/1.0'],
-        api: 'https://discord.com/api',
-        version: '10'
+        rejectOnRateLimit: false
     },
-    // Configuraciones adicionales para entornos restrictivos
-    restRequestTimeout: 45000,
-    restSweepInterval: 300,
-    restTimeOffset: 1000,
-    restGlobalTimeout: 45000,
-    // Configuraciones de conexión específicas para Render
     shards: 'auto',
-    shardCount: 1,
+    allowedMentions: {
+        parse: ['users', 'roles'],
+        repliedUser: false
+    },
     // Configuraciones de caché más simples para evitar warnings
     makeCache: require('discord.js').Options.cacheWithLimits({
         MessageManager: {
@@ -2527,18 +2519,70 @@ async function activateRadioMode(voiceChannel, textChannel) {
     }
 }
 
-// Eventos de error
-client.on('error', (error) => {
-    console.error('❌ Error del cliente Discord:', error);
+// Servidor Express para health checks (optimización para Render)
+const express = require('express');
+const app = express();
+const PORT = process.env.PORT || 10000;
+
+// Middleware básico
+app.use(express.json());
+
+// Health check endpoint optimizado
+app.get('/health', (req, res) => {
+    const status = {
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        bot: {
+            ready: client.readyAt !== null,
+            user: client.user ? client.user.tag : 'Not logged in',
+            guilds: client.guilds.cache.size,
+            ping: client.ws.ping,
+            queue: botState.queue.length,
+            isPlaying: botState.isPlaying,
+            currentSong: botState.currentSong ? {
+                title: botState.currentSong.title,
+                artist: botState.currentSong.artist || botState.currentSong.channel,
+                platform: botState.currentSong.platform
+            } : null
+        },
+        memory: process.memoryUsage(),
+        version: process.env.npm_package_version || '1.0.0'
+    };
+    res.json(status);
 });
 
-client.on('warn', (warning) => {
-    console.warn('⚠️ Advertencia del cliente Discord:', warning);
+// Endpoint raíz
+app.get('/', (req, res) => {
+    res.json({ 
+        message: 'LanaMusic Bot is running!',
+        status: client.readyAt ? 'online' : 'starting...',
+        user: client.user ? client.user.tag : 'Not logged in',
+        guilds: client.guilds.cache.size,
+        queue: botState.queue.length,
+        isPlaying: botState.isPlaying
+    });
 });
 
-client.on('debug', (debug) => {
-    if (debug.includes('Heartbeat')) return; // Ignorar logs de heartbeat
-    console.log('🔍 Debug Discord:', debug);
+// Endpoint de ping
+app.get('/ping', (req, res) => {
+    res.json({ 
+        pong: true, 
+        timestamp: new Date().toISOString(),
+        ping: client.ws.ping
+    });
+});
+
+// Endpoint para interacciones de Discord (webhook)
+app.post('/interactions', (req, res) => {
+    res.json({ type: 1 }); // Respuesta pong para verificación
+});
+
+// Iniciar servidor Express
+app.listen(PORT, '0.0.0.0', () => {
+    console.log('🌐 Servidor Express iniciado para Render');
+    console.log(`🔗 Disponible en: http://0.0.0.0:${PORT}`);
+    console.log('📡 Endpoints: /, /health, /ping, /interactions');
 });
 
 // Los comandos slash se registran automáticamente en el evento 'ready'
