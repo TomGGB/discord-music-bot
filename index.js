@@ -1025,10 +1025,24 @@ if (!process.env.DISCORD_TOKEN) {
 
 console.log('🔐 Token configurado, intentando conectar...');
 
+// Verificar formato del token
+const token = process.env.DISCORD_TOKEN;
+if (!token.includes('.') || token.split('.').length !== 3) {
+    console.error('❌ Token de Discord tiene formato inválido');
+    console.error('🔍 El token debe tener el formato: MTxxxxxxxxx.xxxxxx.xxxxxxxxxxx');
+    process.exit(1);
+}
+
+console.log('✅ Token tiene formato válido');
+
 // Timeout para el evento ready
 setTimeout(() => {
     if (!client.user) {
         console.error('❌ Timeout: El bot no se conectó en 30 segundos');
+        console.error('🔍 Posibles causas:');
+        console.error('   - Token inválido o revocado');
+        console.error('   - Problemas de conectividad');
+        console.error('   - Bot deshabilitado en Discord Developer Portal');
         process.exit(1);
     }
 }, 30000);
@@ -2277,5 +2291,18 @@ async function activateRadioMode(voiceChannel, textChannel) {
     }
 }
 
-// Registrar comandos slash al iniciar el bot
-registerSlashCommands();
+// Eventos de error
+client.on('error', (error) => {
+    console.error('❌ Error del cliente Discord:', error);
+});
+
+client.on('warn', (warning) => {
+    console.warn('⚠️ Advertencia del cliente Discord:', warning);
+});
+
+client.on('debug', (debug) => {
+    if (debug.includes('Heartbeat')) return; // Ignorar logs de heartbeat
+    console.log('🔍 Debug Discord:', debug);
+});
+
+// Los comandos slash se registran automáticamente en el evento 'ready'
