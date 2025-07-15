@@ -5,6 +5,13 @@ try {
     console.log('📝 Archivo .env no encontrado, usando variables de entorno del sistema');
 }
 
+// Diagnóstico de variables de entorno
+console.log('🔍 Verificando variables de entorno...');
+console.log('NODE_ENV:', process.env.NODE_ENV);
+console.log('DISCORD_TOKEN:', process.env.DISCORD_TOKEN ? 'CONFIGURADO' : 'NO CONFIGURADO');
+console.log('SPOTIFY_CLIENT_ID:', process.env.SPOTIFY_CLIENT_ID ? 'CONFIGURADO' : 'NO CONFIGURADO');
+console.log('SPOTIFY_CLIENT_SECRET:', process.env.SPOTIFY_CLIENT_SECRET ? 'CONFIGURADO' : 'NO CONFIGURADO');
+
 const { Client, GatewayIntentBits, PermissionsBitField } = require('discord.js');
 const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, StreamType } = require('@discordjs/voice');
 const ytdl = require('@distube/ytdl-core');
@@ -59,10 +66,17 @@ const client = new Client({
 });
 
 // Configuración de Spotify
+console.log('🎵 Configurando Spotify API...');
 const spotifyApi = new SpotifyWebApi({
     clientId: process.env.SPOTIFY_CLIENT_ID,
     clientSecret: process.env.SPOTIFY_CLIENT_SECRET
 });
+
+// Verificar que las credenciales de Spotify estén configuradas
+if (!process.env.SPOTIFY_CLIENT_ID || !process.env.SPOTIFY_CLIENT_SECRET) {
+    console.log('⚠️  Advertencia: Credenciales de Spotify no configuradas');
+    console.log('   El bot funcionará solo con YouTube');
+}
 
 // Estado del bot
 const botState = {
@@ -85,11 +99,13 @@ const botState = {
 // Función para obtener token de Spotify
 async function getSpotifyToken() {
     try {
+        console.log('🔑 Obteniendo token de Spotify...');
         const data = await spotifyApi.clientCredentialsGrant();
         spotifyApi.setAccessToken(data.body['access_token']);
         console.log(config.messages.spotifyTokenObtained);
     } catch (error) {
-        console.error(config.messages.spotifyTokenError, error);
+        console.error('❌ Error obteniendo token de Spotify:', error.message);
+        console.error('🔍 Verifica que SPOTIFY_CLIENT_ID y SPOTIFY_CLIENT_SECRET estén configurados correctamente');
     }
 }
 
@@ -790,6 +806,7 @@ async function createControlPanel(guildId) {
 // Eventos del bot
 client.on('ready', async () => {
     console.log(`${config.messages.botConnected} ${client.user.tag}`);
+    console.log('🎮 Bot listo y conectado a Discord');
     
     // Obtener token de Spotify
     await getSpotifyToken();
@@ -798,6 +815,7 @@ client.on('ready', async () => {
     setInterval(getSpotifyToken, config.spotify.tokenRefreshInterval);
     
     // Cargar configuraciones existentes de servidores
+    console.log('📁 Cargando configuraciones de servidores...');
     for (const guild of client.guilds.cache.values()) {
         const musicChannelId = getMusicChannelId(guild.id);
         if (musicChannelId) {
@@ -919,7 +937,20 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 // Iniciar sesión del bot
-client.login(process.env.DISCORD_TOKEN);
+console.log('🔐 Iniciando sesión del bot...');
+if (!process.env.DISCORD_TOKEN) {
+    console.error('❌ DISCORD_TOKEN no está configurado');
+    process.exit(1);
+}
+
+client.login(process.env.DISCORD_TOKEN)
+    .then(() => {
+        console.log('✅ Sesión iniciada correctamente');
+    })
+    .catch(error => {
+        console.error('❌ Error al iniciar sesión:', error.message);
+        process.exit(1);
+    });
 
 // Función para procesar álbum de Spotify
 async function processSpotifyAlbum(albumId, message, voiceChannel) {
