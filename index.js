@@ -63,7 +63,31 @@ const client = new Client({
         GatewayIntentBits.GuildVoiceStates,
         GatewayIntentBits.GuildMessageReactions,
         GatewayIntentBits.GuildIntegrations
-    ]
+    ],
+    // Configuraciones específicas para Render
+    ws: {
+        compress: false,
+        large_threshold: 50,
+        version: 10,
+        properties: {
+            $browser: 'Discord.js',
+            $device: 'Discord.js',
+            $os: 'linux'
+        }
+    },
+    // Configuraciones de red para entornos de producción
+    rest: {
+        timeout: 60000,
+        retries: 5,
+        rejectOnRateLimit: false,
+        userAgentSuffix: ['LanaMusic-Bot/1.0']
+    },
+    // Configuración adicional para Render
+    restRequestTimeout: 60000,
+    restSweepInterval: 60,
+    restTimeOffset: 500,
+    restGlobalTimeout: 60000,
+    proxy: process.env.HTTP_PROXY || process.env.HTTPS_PROXY || undefined
 });
 
 // Configuración de Spotify
@@ -1040,21 +1064,29 @@ console.log('✅ Token tiene formato válido');
 console.log('🔌 Intentando conectar a Discord...');
 console.log('🔑 Token empieza con:', process.env.DISCORD_TOKEN.substring(0, 20) + '...');
 
-// Timeout para el evento ready
+// Timeout para el evento ready (aumentado para Render)
 setTimeout(() => {
     if (!client.user) {
-        console.error('❌ Timeout: El bot no se conectó en 30 segundos');
+        console.error('❌ Timeout: El bot no se conectó en 60 segundos');
         console.error('🔍 Posibles causas:');
         console.error('   - Token inválido o revocado');
-        console.error('   - Problemas de conectividad');
+        console.error('   - Problemas de conectividad de Render');
         console.error('   - Bot deshabilitado en Discord Developer Portal');
         console.error('   - Intents incorrectos');
+        console.error('   - Problemas de websockets en Render');
         process.exit(1);
     }
-}, 30000);
+}, 60000); // Aumentado a 60 segundos
 
-client.login(process.env.DISCORD_TOKEN)
-    .then(() => {
+// Hacer el client globalmente accesible para keep-alive
+global.client = client;
+
+// Función para conectar con reintentos
+async function connectToDiscord(retries = 3) {
+    console.log(`🔌 Intento de conexión ${4 - retries}/3...`);
+    
+    try {
+        await client.login(process.env.DISCORD_TOKEN);
         console.log('✅ Sesión iniciada correctamente');
         
         // Mantener el bot activo en producción (después del login)
@@ -1062,23 +1094,36 @@ client.login(process.env.DISCORD_TOKEN)
             require('./keep-alive');
             console.log('🌐 Keep-alive server iniciado para producción');
         }
-    })
-    .catch(error => {
+        
+    } catch (error) {
         console.error('❌ Error al iniciar sesión:', error.message);
         console.error('🔍 Código de error:', error.code);
-        console.error('🔍 Detalles completos:', error);
         
         // Errores comunes
         if (error.code === 'INVALID_TOKEN') {
             console.error('🚨 TOKEN INVÁLIDO: Verifica tu token en Discord Developer Portal');
+            process.exit(1);
         } else if (error.code === 'DISALLOWED_INTENTS') {
             console.error('🚨 INTENTS NO PERMITIDOS: Habilita los intents en Discord Developer Portal');
+            process.exit(1);
         } else if (error.code === 'RATE_LIMITED') {
-            console.error('🚨 RATE LIMITED: Demasiadas conexiones, espera un momento');
+            console.error('🚨 RATE LIMITED: Demasiadas conexiones, esperando...');
         }
         
-        process.exit(1);
-    });
+        // Reintentar si quedan intentos
+        if (retries > 0) {
+            console.log(`🔄 Reintentando en 5 segundos... (${retries} intentos restantes)`);
+            await new Promise(resolve => setTimeout(resolve, 5000));
+            return connectToDiscord(retries - 1);
+        } else {
+            console.error('❌ Se agotaron los intentos de conexión');
+            process.exit(1);
+        }
+    }
+}
+
+// Iniciar conexión con reintentos
+connectToDiscord();
 
 // Función para procesar álbum de Spotify
 async function processSpotifyAlbum(albumId, message, voiceChannel) {
