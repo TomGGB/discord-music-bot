@@ -1,4 +1,10 @@
-require('dotenv').config();
+// Cargar variables de entorno (opcional en producción)
+try {
+    require('dotenv').config();
+} catch (error) {
+    console.log('📝 Archivo .env no encontrado, usando variables de entorno del sistema');
+}
+
 const { Client, GatewayIntentBits, PermissionsBitField } = require('discord.js');
 const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, StreamType } = require('@discordjs/voice');
 const ytdl = require('@distube/ytdl-core');
