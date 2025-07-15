@@ -100,10 +100,12 @@ discord-music-bot/
 
 - `discord.js` - API de Discord
 - `@discordjs/voice` - Funcionalidad de voz
+- `play-dl` - Biblioteca optimizada para streaming de audio (compatible con Render)
 - `ytdl-core` - Descargar audio de YouTube
 - `youtube-sr` - Buscar videos en YouTube
 - `spotify-web-api-node` - API de Spotify
 - `ffmpeg-static` - Procesamiento de audio
+- `@discordjs/opus` - Codificación de audio Opus para mejor compatibilidad
 
 ## Notas
 
@@ -126,3 +128,9 @@ discord-music-bot/
 ### El bot no responde
 - Verifica el ID del canal en `.env`
 - Revisa que el bot tenga permisos de lectura y escritura en el canal
+
+### El bot se conecta pero no reproduce audio en Render
+- El bot utiliza una implementación optimizada para Render en `play-dl-stream.js`
+- Asegúrate de que las dependencias `play-dl` y `@discordjs/opus` estén instaladas
+- Verifica que el bot tenga permisos para crear streams de audio
+- La configuración usa `StreamType.OggOpus` para mejor compatibilidad con Render

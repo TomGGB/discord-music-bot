@@ -500,7 +500,7 @@ async function playMusic(voiceChannel, textChannel) {
 
         botState.currentSong = resolvedSong;
 
-        // Crear el recurso de audio con play-dl (más confiable)
+        // Crear el recurso de audio con play-dl (optimizado para Render)
         let stream;
         try {
             console.log(`Creando stream para: ${resolvedSong.title}`);
@@ -508,7 +508,7 @@ async function playMusic(voiceChannel, textChannel) {
             console.log(`Tipo de URL: ${typeof resolvedSong.url}`);
             console.log(`URL válida: ${resolvedSong.url !== undefined && resolvedSong.url !== 'undefined'}`);
             
-            // Validar la URL antes de usar play.stream
+            // Validar la URL antes de crear el stream
             if (!resolvedSong.url || resolvedSong.url === 'undefined' || resolvedSong.url === undefined) {
                 throw new Error(`URL inválida: ${resolvedSong.url}`);
             }
@@ -517,34 +517,51 @@ async function playMusic(voiceChannel, textChannel) {
             const urlString = String(resolvedSong.url).trim();
             console.log(`URL como string: ${urlString}`);
             
-            // Usar directamente youtube-dl-exec como método principal
-            console.log('🎵 Usando youtube-dl-exec como método principal...');
+            // Importar la implementación optimizada para Render
+            const { createStreamWithPlayDl, createStreamWithPlayDlAndFfmpeg } = require('./play-dl-stream');
+            
+            // Intentar crear stream con play-dl (optimizado para Render)
+            console.log('🎵 Usando play-dl como método principal (optimizado para Render)...');
             
             try {
-                stream = await createStreamWithYoutubeDl(urlString);
-                console.log('✅ Stream creado exitosamente con youtube-dl-exec');
+                // Intentar primero con play-dl directo
+                stream = await createStreamWithPlayDl(urlString);
+                console.log('✅ Stream creado exitosamente con play-dl');
             } catch (error) {
-                console.error('❌ Error creando stream:', error.message);
-                botState.queue.shift();
-                if (botState.queue.length > 0) {
-                    return playMusic(voiceChannel, textChannel);
+                console.log('⚠️ Error con play-dl directo, intentando con FFmpeg:', error.message);
+                
+                try {
+                    // Intentar con play-dl + FFmpeg como fallback
+                    stream = await createStreamWithPlayDlAndFfmpeg(urlString);
+                    console.log('✅ Stream creado exitosamente con play-dl + FFmpeg');
+                } catch (fallbackError) {
+                    console.error('❌ Error creando stream con todos los métodos:', fallbackError.message);
+                    botState.queue.shift();
+                    if (botState.queue.length > 0) {
+                        return playMusic(voiceChannel, textChannel);
+                    }
+                    return;
                 }
-                return;
             }
             
             console.log('Stream obtenido exitosamente');
             
-            // Mejorar el manejo del stream para evitar entrecortado
-            stream.on('error', (error) => {
-                console.error('Error en el stream:', error);
-            });
-            
-            // Reducir el tiempo de espera para el stream
-            await new Promise((resolve, reject) => {
-                stream.once('readable', resolve);
-                stream.once('error', reject);
-                setTimeout(() => reject(new Error('Stream timeout')), 5000); // Reducido de 10s a 5s
-            });
+            // Verificar si stream es un objeto con propiedad stream (formato {stream, type})
+            if (stream && typeof stream === 'object' && stream.stream) {
+                // Mejorar el manejo del stream para evitar entrecortado
+                stream.stream.on('error', (error) => {
+                    console.error('Error en el stream:', error);
+                });
+                
+                // Reducir el tiempo de espera para el stream
+                await new Promise((resolve, reject) => {
+                    stream.stream.once('readable', resolve);
+                    stream.stream.once('error', reject);
+                    setTimeout(() => reject(new Error('Stream timeout')), 5000); // Reducido de 10s a 5s
+                });
+            } else {
+                console.log('⚠️ El stream no tiene el formato esperado {stream, type}');
+            }
             
         } catch (streamError) {
             console.error('Error al crear el stream:', streamError);
@@ -555,11 +572,32 @@ async function playMusic(voiceChannel, textChannel) {
             return;
         }
 
-        const resource = createAudioResource(stream, {
-            inputType: StreamType.Arbitrary,
-            inlineVolume: true,
-            silencePaddingFrames: 5 // Reducir padding para menos latencia
-        });
+        // Usar la función de creación de recurso de audio optimizada para Render
+        let resource;
+        try {
+            const { createAudioResourceFromUrl } = require('./play-dl-stream');
+            resource = await createAudioResourceFromUrl(urlString);
+            console.log('✅ Recurso de audio creado con configuración optimizada para Render');
+        } catch (resourceError) {
+            // Fallback a la creación de recurso tradicional
+            console.log('⚠️ Usando método alternativo para crear recurso de audio');
+            
+            // Verificar si stream es un objeto con propiedad stream (formato {stream, type})
+            if (stream && typeof stream === 'object' && stream.stream) {
+                resource = createAudioResource(stream.stream, {
+                    inputType: stream.type || StreamType.OggOpus,
+                    inlineVolume: true,
+                    silencePaddingFrames: 3 // Reducir padding para menos latencia
+                });
+            } else {
+                // Si es un stream directo
+                resource = createAudioResource(stream, {
+                    inputType: StreamType.OggOpus, // Usar OggOpus para mejor compatibilidad con Render
+                    inlineVolume: true,
+                    silencePaddingFrames: 3 // Reducir padding para menos latencia
+                });
+            }
+        }
 
         // Establecer volumen por defecto más bajo para evitar distorsión
         resource.volume?.setVolume(0.3);
