@@ -106,6 +106,7 @@ discord-music-bot/
 - `spotify-web-api-node` - API de Spotify
 - `ffmpeg-static` - Procesamiento de audio
 - `@discordjs/opus` - Codificación de audio Opus para mejor compatibilidad
+- `opusscript` - Alternativa a @discordjs/opus para entornos donde los módulos nativos fallan
 
 ## Notas
 
@@ -132,5 +133,7 @@ discord-music-bot/
 ### El bot se conecta pero no reproduce audio en Render
 - El bot utiliza una implementación optimizada para Render en `play-dl-stream.js`
 - Asegúrate de que las dependencias `play-dl` y `@discordjs/opus` estén instaladas
+- El bot ahora incluye un sistema de fallback a `opusscript` cuando `@discordjs/opus` no está disponible
 - Verifica que el bot tenga permisos para crear streams de audio
 - La configuración usa `StreamType.OggOpus` para mejor compatibilidad con Render
+- Consulta `OPUS_FALLBACK_SOLUTION.md` para más detalles sobre la solución de audio

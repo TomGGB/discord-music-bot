@@ -34,6 +34,7 @@
     "dotenv": "^16.3.1",
     "express": "^5.1.0",
     "ffmpeg-static": "^5.2.0",
+    "opusscript": "^0.0.8",
     "play-dl": "^1.9.7",
     "sodium-native": "^5.0.6",
     "spotify-web-api-node": "^5.0.2",

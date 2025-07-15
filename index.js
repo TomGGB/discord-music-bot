@@ -12,6 +12,12 @@ console.log('DISCORD_TOKEN:', process.env.DISCORD_TOKEN ? 'CONFIGURADO' : 'NO CO
 console.log('SPOTIFY_CLIENT_ID:', process.env.SPOTIFY_CLIENT_ID ? 'CONFIGURADO' : 'NO CONFIGURADO');
 console.log('SPOTIFY_CLIENT_SECRET:', process.env.SPOTIFY_CLIENT_SECRET ? 'CONFIGURADO' : 'NO CONFIGURADO');
 
+// Cargar y configurar biblioteca Opus (con fallback a opusscript)
+const { loadOpusLibrary, setupOpusForDiscordVoice } = require('./opus-fallback');
+loadOpusLibrary();
+setupOpusForDiscordVoice();
+console.log('🎵 Sistema de audio configurado con soporte para fallback a opusscript');
+
 const { Client, GatewayIntentBits, PermissionsBitField } = require('discord.js');
 const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, StreamType } = require('@discordjs/voice');
 const play = require('play-dl');
