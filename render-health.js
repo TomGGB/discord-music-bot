@@ -85,6 +85,97 @@ app.get('/oauth2/callback', (req, res) => {
     });
 });
 
+// Endpoint de interacciones de Discord (requerido para slash commands)
+app.post('/interactions', express.json(), (req, res) => {
+    const { type, data, id, token } = req.body;
+    
+    // Verificar headers de Discord
+    const signature = req.headers['x-signature-ed25519'];
+    const timestamp = req.headers['x-signature-timestamp'];
+    
+    console.log('📨 Interacción recibida:', {
+        type,
+        command: data?.name || 'unknown',
+        id,
+        signature: signature ? 'presente' : 'ausente',
+        timestamp,
+        headers: Object.keys(req.headers).filter(h => h.startsWith('x-'))
+    });
+    
+    // Tipo 1: PING - Discord verifica que el endpoint funciona
+    if (type === 1) {
+        console.log('🏓 Discord PING recibido - respondiendo PONG');
+        return res.json({ type: 1 }); // PONG response
+    }
+    
+    // Tipo 2: APPLICATION_COMMAND - Comando slash
+    if (type === 2) {
+        console.log('⚡ Comando slash recibido:', data.name);
+        
+        // Respuesta específica por comando
+        if (data.name === 'ping') {
+            return res.json({
+                type: 4, // CHANNEL_MESSAGE_WITH_SOURCE
+                data: {
+                    content: '🏓 ¡Pong! El bot está funcionando correctamente desde Render.',
+                    flags: 64 // EPHEMERAL
+                }
+            });
+        }
+        
+        if (data.name === 'setup') {
+            return res.json({
+                type: 4,
+                data: {
+                    content: '⚙️ Comando setup recibido. Nota: Este endpoint web recibe comandos pero el bot principal los procesará.',
+                    flags: 64
+                }
+            });
+        }
+        
+        // Respuesta genérica para otros comandos
+        return res.json({
+            type: 4,
+            data: {
+                content: `✅ Comando /${data.name} recibido correctamente en el servidor web!`,
+                flags: 64
+            }
+        });
+    }
+    
+    // Tipo 3: MESSAGE_COMPONENT - Botones, selects, etc.
+    if (type === 3) {
+        console.log('🔘 Componente de mensaje:', data.custom_id);
+        return res.json({
+            type: 4,
+            data: {
+                content: '✅ Componente procesado correctamente',
+                flags: 64
+            }
+        });
+    }
+    
+    // Otros tipos de interacciones
+    console.log('❓ Tipo de interacción desconocida:', type);
+    res.json({
+        type: 4,
+        data: {
+            content: 'Tipo de interacción no soportada',
+            flags: 64
+        }
+    });
+});
+
+// Endpoint GET para verificar interacciones (Discord a veces usa GET)
+app.get('/interactions', (req, res) => {
+    res.json({
+        message: 'Endpoint de interacciones activo',
+        timestamp: new Date().toISOString(),
+        methods: ['POST'],
+        discord_verification: 'ready'
+    });
+});
+
 // Endpoints opcionales para términos y privacidad
 app.get('/terms', (req, res) => {
     res.send(`
