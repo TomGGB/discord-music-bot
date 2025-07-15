@@ -18,10 +18,10 @@ const play = require('play-dl');
 const yts = require('youtube-sr').default;
 const ytpl = require('ytpl');
 const SpotifyWebApi = require('spotify-web-api-node');
-const youtubedl = require('youtube-dl-exec');
 const { spawn } = require('child_process');
 const { PassThrough } = require('stream');
 const ffmpegPath = require('ffmpeg-static');
+const ytdl = require('ytdl-core');
 
 // Configurar Spotify API
 const spotifyApi = new SpotifyWebApi({
@@ -517,14 +517,14 @@ async function playMusic(voiceChannel, textChannel) {
             const urlString = String(resolvedSong.url).trim();
             console.log(`URL como string: ${urlString}`);
             
-            // Usar directamente youtube-dl-exec como método principal
-            console.log('🎵 Usando youtube-dl-exec como método principal...');
+            // Usar ytdl-core como método principal
+            console.log('🎵 Usando ytdl-core como método principal...');
             
             try {
-                stream = await createStreamWithYoutubeDl(urlString);
-                console.log('✅ Stream creado exitosamente con youtube-dl-exec');
+                stream = await createStreamWithYtdlCore(urlString);
+                console.log('✅ Stream creado exitosamente con ytdl-core');
             } catch (error) {
-                console.error('❌ Error creando stream:', error.message);
+                console.error('❌ Error creando stream con ytdl-core:', error.message);
                 botState.queue.shift();
                 if (botState.queue.length > 0) {
                     return playMusic(voiceChannel, textChannel);
@@ -2663,74 +2663,61 @@ app.listen(PORT, '0.0.0.0', () => {
 // Los comandos slash se registran automáticamente en el evento 'ready'
 
 // Función para crear stream con youtube-dl-exec como fallback
-async function createStreamWithYoutubeDl(url) {
+async function createStreamWithYtdlCore(url) {
     try {
-        console.log('🔧 Intentando crear stream con youtube-dl-exec...');
-        
-        // Usar youtube-dl-exec con parámetros compatibles
-        const info = await youtubedl(url, {
-            dumpSingleJson: true,
-            noCheckCertificates: true,
-            noWarnings: true,
-            preferFreeFormats: true,
-            format: 'bestaudio/best'
-        });
-        
-        if (!info || !info.url) {
-            throw new Error('No se pudo obtener información del video');
+        console.log('🔧 Intentando crear stream con ytdl-core como método principal...');
+
+        // Verificar si la URL es válida
+        if (!ytdl.validateURL(url)) {
+            throw new Error('URL de YouTube inválida');
         }
-        
-        console.log('🎵 Información del video obtenida:');
-        console.log('🎵 Título:', info.title);
-        console.log('🎵 Duración:', info.duration);
-        console.log('🎵 Formato:', info.format_id);
-        
-        // Crear stream usando FFmpeg con configuración optimizada
-        const ffmpegProcess = spawn(ffmpegPath, [
-            '-i', info.url,
-            '-f', 'opus',
-            '-ar', '48000',
-            '-ac', '2',
-            '-b:a', '96k',
-            '-vn',
-            '-loglevel', 'error',
-            'pipe:1'
-        ], {
-            stdio: ['pipe', 'pipe', 'pipe']
+
+        // Obtener información básica del video
+        const info = await ytdl.getInfo(url);
+        console.log(`✅ Información obtenida para: ${info.videoDetails.title}`);
+
+        // Crear un PassThrough para mayor estabilidad
+        const passthrough = new PassThrough({
+            highWaterMark: 1 << 25 // Buffer grande (~32MB)
         });
-        
-        const stream = new PassThrough();
-        
-        ffmpegProcess.stdout.on('data', (chunk) => {
-            stream.write(chunk);
+
+        // Obtener stream con ytdl-core con opciones optimizadas
+        console.log('🔄 Descargando audio con ytdl-core...');
+        const stream = ytdl.downloadFromInfo(info, {
+            filter: 'audioonly',
+            quality: 'highestaudio',
+            highWaterMark: 1 << 25
         });
-        
-        ffmpegProcess.stdout.on('end', () => {
-            stream.end();
+
+        // Conectar el stream al PassThrough
+        stream.pipe(passthrough);
+
+        // Manejar errores
+        stream.on('error', (error) => {
+            console.error('❌ Error en ytdl-core stream:', error.message);
+            passthrough.destroy(error);
         });
-        
-        ffmpegProcess.stderr.on('data', (data) => {
-            console.log('🔧 FFmpeg stderr:', data.toString());
+
+        // Manejar eventos de progreso para debugging
+        stream.on('progress', (chunkLength, downloaded, total) => {
+            const percent = downloaded / total * 100;
+            console.log(`🔄 Progreso de descarga: ${percent.toFixed(2)}% (${(downloaded / 1024 / 1024).toFixed(2)}MB de ${(total / 1024 / 1024).toFixed(2)}MB)`);
         });
-        
-        ffmpegProcess.on('error', (error) => {
-            console.error('❌ Error en FFmpeg:', error);
-            stream.destroy(error);
+
+        // Manejar fin de stream
+        stream.on('end', () => {
+            console.log('✅ Descarga de audio completada');
         });
-        
-        ffmpegProcess.on('close', (code) => {
-            if (code !== 0) {
-                console.error(`❌ FFmpeg terminó con código ${code}`);
-            } else {
-                console.log('✅ FFmpeg terminó correctamente');
-            }
-        });
-        
-        console.log('✅ Stream creado exitosamente con youtube-dl-exec');
-        return stream;
-        
+
+        console.log('✅ Stream obtenido con ytdl-core');
+
+        // Devolver un objeto similar al que devuelve play.stream()
+        return {
+            stream: passthrough,
+            type: 'arbitrary' // ytdl-core no devuelve Opus, necesita FFmpeg
+        };
     } catch (error) {
-        console.error('❌ Error con youtube-dl-exec:', error.message);
+        console.error('❌ Error con ytdl-core:', error.message);
         throw error;
     }
 }
