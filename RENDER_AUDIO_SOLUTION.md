@@ -85,3 +85,13 @@ const resource = createAudioResource(stream, {
 - Las configuraciones pueden necesitar ajustes según el tipo de plan en Render
 - El uso de `StreamType.OggOpus` es crucial para la compatibilidad
 - La implementación incluye manejo de errores robusto para mayor estabilidad
+
+## Mejora: Sistema de Fallback para Opus
+
+Se ha implementado un sistema de fallback para la biblioteca Opus que permite al bot funcionar incluso cuando `@discordjs/opus` no está disponible en el entorno de Render:
+
+- Nuevo módulo `opus-fallback.js` que intenta cargar `@discordjs/opus` y, si falla, utiliza `opusscript` como alternativa
+- Integración transparente con `@discordjs/voice` sin necesidad de modificar el código existente
+- Mayor compatibilidad con entornos donde los módulos nativos pueden fallar
+
+Para más detalles sobre esta solución, consulta el archivo `OPUS_FALLBACK_SOLUTION.md`.

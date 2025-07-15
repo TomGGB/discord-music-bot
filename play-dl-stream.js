@@ -23,16 +23,7 @@ if (isRender) {
                 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36'
             ]
         });
-        
-        // Configurar opciones adicionales para play-dl
-        play.setPlayOptions({
-            seek: 0,
-            quality: 1,       // Calidad más baja pero estable
-            htmldata: false,  // No necesitamos datos HTML
-            disableFormatSelection: true, // Deshabilitar selección de formato para mayor velocidad
-            backupIfNoAudio: true // Usar respaldo si no hay audio
-        });
-        
+
         console.log('✅ play-dl configurado para Render con opciones optimizadas');
     } catch (error) {
         console.error('⚠️ Error al configurar play-dl para Render:', error.message);
