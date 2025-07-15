@@ -131,6 +131,38 @@ function handlePauseCommand(message, player, botState) {
 }
 
 /**
+ * Maneja el comando !setchannel
+ * @param {Message} message - Mensaje de Discord
+ */
+function handleSetChannelCommand(message) {
+    const { setMusicChannel } = require('./server-config');
+    
+    try {
+        setMusicChannel(message.guild.id, message.channel.id);
+        message.reply(`✅ Canal de música configurado: ${message.channel.name}`);
+    } catch (error) {
+        console.error('Error configurando canal:', error);
+        message.reply('❌ Error configurando el canal de música');
+    }
+}
+
+/**
+ * Maneja el comando !resume
+ * @param {Message} message - Mensaje de Discord
+ * @param {AudioPlayer} player - Reproductor de audio
+ * @param {Object} botState - Estado del bot
+ */
+function handleResumeCommand(message, player, botState) {
+    if (player && botState.isPaused) {
+        player.unpause();
+        botState.isPaused = false;
+        message.react(config.bot.reactions.resume);
+    } else {
+        message.reply({ embeds: [createErrorEmbed('No hay ninguna canción pausada.')] });
+    }
+}
+
+/**
  * Maneja las reacciones del panel de control
  * @param {MessageReaction} reaction - Reacción del mensaje
  * @param {User} user - Usuario que reaccionó
@@ -266,6 +298,19 @@ function processCommand(message, botState) {
     const content = message.content.toLowerCase().trim();
     const { player, queue, connection, currentSong } = botState;
     
+    // Comando !play con parámetros
+    if (content.startsWith('!play ')) {
+        const searchTerm = message.content.slice(6).trim(); // Remover "!play "
+        if (searchTerm) {
+            // Retornar false para que se procese como búsqueda normal
+            message.content = searchTerm;
+            return false;
+        } else {
+            message.reply('**Uso:** `!play <canción/URL>`\n**Ejemplo:** `!play Never Gonna Give You Up`');
+            return true;
+        }
+    }
+    
     switch (content) {
         case '!skip':
             handleSkipCommand(message, player);
@@ -291,6 +336,14 @@ function processCommand(message, botState) {
             handlePauseCommand(message, player, botState);
             return true;
             
+        case '!setchannel':
+            handleSetChannelCommand(message);
+            return true;
+            
+        case '!resume':
+            handleResumeCommand(message, player, botState);
+            return true;
+            
         default:
             return false;
     }
@@ -304,5 +357,7 @@ module.exports = {
     handleCurrentCommand,
     handleHelpCommand,
     handlePauseCommand,
+    handleSetChannelCommand,
+    handleResumeCommand,
     handleControlPanelReaction
 };

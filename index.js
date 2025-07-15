@@ -14,10 +14,20 @@ console.log('SPOTIFY_CLIENT_SECRET:', process.env.SPOTIFY_CLIENT_SECRET ? 'CONFI
 
 const { Client, GatewayIntentBits, PermissionsBitField } = require('discord.js');
 const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, StreamType } = require('@discordjs/voice');
-const ytdl = require('@distube/ytdl-core');
+const play = require('play-dl');
 const yts = require('youtube-sr').default;
 const ytpl = require('ytpl');
 const SpotifyWebApi = require('spotify-web-api-node');
+const youtubedl = require('youtube-dl-exec');
+const { spawn } = require('child_process');
+const { PassThrough } = require('stream');
+const ffmpegPath = require('ffmpeg-static');
+
+// Configurar Spotify API
+const spotifyApi = new SpotifyWebApi({
+    clientId: process.env.SPOTIFY_CLIENT_ID,
+    clientSecret: process.env.SPOTIFY_CLIENT_SECRET
+});
 
 // Importar módulos personalizados
 const config = require('./config');
@@ -110,10 +120,21 @@ const client = new Client({
 
 // Configuración de Spotify
 console.log('🎵 Configurando Spotify API...');
-const spotifyApi = new SpotifyWebApi({
-    clientId: process.env.SPOTIFY_CLIENT_ID,
-    clientSecret: process.env.SPOTIFY_CLIENT_SECRET
-});
+
+// Configurar play-dl
+(async () => {
+    try {
+        // Establecer cookies de YouTube (opcional pero recomendado)
+        await play.setToken({
+            youtube: {
+                cookie: process.env.YOUTUBE_COOKIE || ''
+            }
+        });
+        console.log('🎵 Play-dl configurado correctamente');
+    } catch (error) {
+        console.log('⚠️  Play-dl: usando configuración por defecto');
+    }
+})();
 
 // Verificar que las credenciales de Spotify estén configuradas
 if (!process.env.SPOTIFY_CLIENT_ID || !process.env.SPOTIFY_CLIENT_SECRET) {
@@ -212,6 +233,9 @@ async function searchYouTube(query, retries = 3) {
                 let bestResult = results[0];
                 
                 for (const video of results) {
+                    // Verificar que el video tenga URL válida
+                    if (!video.url || !video.id) continue;
+                    
                     // Priorizar videos con cierta duración (no muy cortos ni muy largos)
                     if (video.duration && video.duration > 30 && video.duration < 600) {
                         // Priorizar resultados que contengan palabras clave musicales
@@ -228,35 +252,57 @@ async function searchYouTube(query, retries = 3) {
                 console.log(`Resultado encontrado: ${video.title} - ${video.channel?.name}`);
                 
                 // Verificar que la URL sea válida antes de devolverla
-                if (ytdl.validateURL(video.url)) {
-                    // Convertir duración a segundos si viene en formato de tiempo
-                    let durationInSeconds = video.duration;
+                if (video.url && video.id) {
+                    // Asegurar URL válida de YouTube
+                    let validUrl = video.url;
                     
-                    if (typeof video.duration === 'string') {
-                        // Si viene en formato mm:ss o hh:mm:ss
-                        const timeParts = video.duration.split(':').map(Number);
-                        if (timeParts.length === 2) {
-                            durationInSeconds = timeParts[0] * 60 + timeParts[1];
-                        } else if (timeParts.length === 3) {
-                            durationInSeconds = timeParts[0] * 3600 + timeParts[1] * 60 + timeParts[2];
-                        }
-                    } else if (typeof video.duration === 'number') {
-                        // Si es número, verificar si está en milisegundos
-                        if (video.duration > 10000) {
-                            // Probablemente esté en milisegundos
-                            durationInSeconds = Math.floor(video.duration / 1000);
-                        } else {
-                            durationInSeconds = video.duration;
-                        }
+                    // Si no tiene URL válida, construir una con el ID
+                    if (!validUrl || validUrl === 'undefined') {
+                        validUrl = `https://www.youtube.com/watch?v=${video.id}`;
                     }
                     
-                    return {
-                        title: video.title,
-                        url: video.url,
-                        duration: durationInSeconds,
-                        thumbnail: video.thumbnail?.url || null,
-                        channel: video.channel?.name || 'Desconocido'
-                    };
+                    // Validar con play-dl
+                    const urlType = play.yt_validate(validUrl);
+                    if (urlType === 'video') {
+                        // Convertir duración a segundos si viene en formato de tiempo
+                        let durationInSeconds = video.duration;
+                        
+                        if (typeof video.duration === 'string') {
+                            // Si viene en formato mm:ss o hh:mm:ss
+                            const timeParts = video.duration.split(':').map(Number);
+                            if (timeParts.length === 2) {
+                                durationInSeconds = timeParts[0] * 60 + timeParts[1];
+                            } else if (timeParts.length === 3) {
+                                durationInSeconds = timeParts[0] * 3600 + timeParts[1] * 60 + timeParts[2];
+                            }
+                        } else if (typeof video.duration === 'number') {
+                            // Si es número, verificar si está en milisegundos
+                            if (video.duration > 10000) {
+                                // Probablemente esté en milisegundos
+                                durationInSeconds = Math.floor(video.duration / 1000);
+                            } else {
+                                durationInSeconds = video.duration;
+                            }
+                        }
+                        
+                        // Validar que todos los campos sean válidos antes de devolver
+                        const songData = {
+                            title: video.title || 'Título desconocido',
+                            url: validUrl,
+                            duration: durationInSeconds || 0,
+                            thumbnail: video.thumbnail?.url || null,
+                            channel: video.channel?.name || 'Desconocido'
+                        };
+                        
+                        console.log('Datos de la canción validados:', {
+                            title: songData.title,
+                            url: songData.url,
+                            duration: songData.duration,
+                            hasValidUrl: !!songData.url && songData.url !== 'undefined'
+                        });
+                        
+                        return songData;
+                    }
                 }
             }
             
@@ -377,7 +423,8 @@ async function playMusic(voiceChannel, textChannel) {
             
             botState.player = createAudioPlayer({
                 behaviors: {
-                    noSubscriber: 'pause'
+                    noSubscriber: 'pause',
+                    maxMissedFrames: Math.round(config.audio.maxMissedFrames || 5)
                 }
             });
             botState.connection.subscribe(botState.player);
@@ -453,24 +500,50 @@ async function playMusic(voiceChannel, textChannel) {
 
         botState.currentSong = resolvedSong;
 
-        // Crear el recurso de audio con mejor manejo de errores
+        // Crear el recurso de audio con play-dl (más confiable)
         let stream;
         try {
             console.log(`Creando stream para: ${resolvedSong.title}`);
-            stream = ytdl(resolvedSong.url, {
-                ...config.audio.ytdlOptions,
-                requestOptions: {
-                    headers: {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-                    }
+            console.log(`URL a usar: ${resolvedSong.url}`);
+            console.log(`Tipo de URL: ${typeof resolvedSong.url}`);
+            console.log(`URL válida: ${resolvedSong.url !== undefined && resolvedSong.url !== 'undefined'}`);
+            
+            // Validar la URL antes de usar play.stream
+            if (!resolvedSong.url || resolvedSong.url === 'undefined' || resolvedSong.url === undefined) {
+                throw new Error(`URL inválida: ${resolvedSong.url}`);
+            }
+            
+            // Asegurar que la URL sea string y esté bien formateada
+            const urlString = String(resolvedSong.url).trim();
+            console.log(`URL como string: ${urlString}`);
+            
+            // Usar directamente youtube-dl-exec como método principal
+            console.log('🎵 Usando youtube-dl-exec como método principal...');
+            
+            try {
+                stream = await createStreamWithYoutubeDl(urlString);
+                console.log('✅ Stream creado exitosamente con youtube-dl-exec');
+            } catch (error) {
+                console.error('❌ Error creando stream:', error.message);
+                botState.queue.shift();
+                if (botState.queue.length > 0) {
+                    return playMusic(voiceChannel, textChannel);
                 }
+                return;
+            }
+            
+            console.log('Stream obtenido exitosamente');
+            
+            // Mejorar el manejo del stream para evitar entrecortado
+            stream.on('error', (error) => {
+                console.error('Error en el stream:', error);
             });
             
-            // Esperar a que el stream esté listo
+            // Reducir el tiempo de espera para el stream
             await new Promise((resolve, reject) => {
                 stream.once('readable', resolve);
                 stream.once('error', reject);
-                setTimeout(() => reject(new Error('Stream timeout')), 10000);
+                setTimeout(() => reject(new Error('Stream timeout')), 5000); // Reducido de 10s a 5s
             });
             
         } catch (streamError) {
@@ -484,11 +557,12 @@ async function playMusic(voiceChannel, textChannel) {
 
         const resource = createAudioResource(stream, {
             inputType: StreamType.Arbitrary,
-            inlineVolume: true
+            inlineVolume: true,
+            silencePaddingFrames: 5 // Reducir padding para menos latencia
         });
 
-        // Establecer volumen por defecto
-        resource.volume?.setVolume(0.5);
+        // Establecer volumen por defecto más bajo para evitar distorsión
+        resource.volume?.setVolume(0.3);
 
         // Reproducir la canción
         console.log(`Reproduciendo: ${resolvedSong.title}`);
@@ -882,6 +956,7 @@ client.on('ready', async () => {
     console.log('Bot listo. Usa /setup para configurar el canal de música en cada servidor.');
 });
 
+// Evento para manejar mensajes
 client.on('messageCreate', async (message) => {
     // Ignorar mensajes del bot
     if (message.author.bot) return;
@@ -1545,7 +1620,7 @@ async function processSpotifyPlaylist(playlistId, message, voiceChannel) {
             
             console.log(`Procesando playlist de Spotify: ${playlistData.playlistName} con ${playlistData.tracks.length} canciones`);
             
-            // Agregar cada canción a la cola (SIN buscar en YouTube)
+            // Agregar cada canción a la cola (sin buscar en YouTube)
             let addedCount = 0;
             for (let i = 0; i < playlistData.tracks.length; i++) {
                 const track = playlistData.tracks[i];
@@ -2330,14 +2405,14 @@ async function processYouTubeTrack(url, message, voiceChannel) {
             }, 3000);
             return;
         }
-        if (ytdl.validateURL(url)) {
-            const info = await ytdl.getInfo(url);
+        if (play.yt_validate(url) === 'video') {
+            const info = await play.video_info(url);
             const songInfo = {
-                title: info.videoDetails.title,
+                title: info.video_details.title,
                 url: url,
-                duration: parseInt(info.videoDetails.lengthSeconds),
-                thumbnail: info.videoDetails.thumbnails[0]?.url || null,
-                channel: info.videoDetails.author.name,
+                duration: info.video_details.durationInSec,
+                thumbnail: info.video_details.thumbnails[0]?.url || null,
+                channel: info.video_details.channel.name,
                 source: 'YouTube',
                 platform: 'youtube'
             };
@@ -2586,3 +2661,76 @@ app.listen(PORT, '0.0.0.0', () => {
 });
 
 // Los comandos slash se registran automáticamente en el evento 'ready'
+
+// Función para crear stream con youtube-dl-exec como fallback
+async function createStreamWithYoutubeDl(url) {
+    try {
+        console.log('🔧 Intentando crear stream con youtube-dl-exec...');
+        
+        // Usar youtube-dl-exec con parámetros compatibles
+        const info = await youtubedl(url, {
+            dumpSingleJson: true,
+            noCheckCertificates: true,
+            noWarnings: true,
+            preferFreeFormats: true,
+            format: 'bestaudio/best'
+        });
+        
+        if (!info || !info.url) {
+            throw new Error('No se pudo obtener información del video');
+        }
+        
+        console.log('🎵 Información del video obtenida:');
+        console.log('🎵 Título:', info.title);
+        console.log('🎵 Duración:', info.duration);
+        console.log('🎵 Formato:', info.format_id);
+        
+        // Crear stream usando FFmpeg con configuración optimizada
+        const ffmpegProcess = spawn(ffmpegPath, [
+            '-i', info.url,
+            '-f', 'opus',
+            '-ar', '48000',
+            '-ac', '2',
+            '-b:a', '96k',
+            '-vn',
+            '-loglevel', 'error',
+            'pipe:1'
+        ], {
+            stdio: ['pipe', 'pipe', 'pipe']
+        });
+        
+        const stream = new PassThrough();
+        
+        ffmpegProcess.stdout.on('data', (chunk) => {
+            stream.write(chunk);
+        });
+        
+        ffmpegProcess.stdout.on('end', () => {
+            stream.end();
+        });
+        
+        ffmpegProcess.stderr.on('data', (data) => {
+            console.log('🔧 FFmpeg stderr:', data.toString());
+        });
+        
+        ffmpegProcess.on('error', (error) => {
+            console.error('❌ Error en FFmpeg:', error);
+            stream.destroy(error);
+        });
+        
+        ffmpegProcess.on('close', (code) => {
+            if (code !== 0) {
+                console.error(`❌ FFmpeg terminó con código ${code}`);
+            } else {
+                console.log('✅ FFmpeg terminó correctamente');
+            }
+        });
+        
+        console.log('✅ Stream creado exitosamente con youtube-dl-exec');
+        return stream;
+        
+    } catch (error) {
+        console.error('❌ Error con youtube-dl-exec:', error.message);
+        throw error;
+    }
+}

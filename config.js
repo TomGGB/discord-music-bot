@@ -26,18 +26,22 @@ const config = {
     
     // Configuración de audio
     audio: {
-        // Configuración de ytdl-core
-        ytdlOptions: {
-            filter: 'audioonly',
-            quality: 'highestaudio',
-            highWaterMark: 1 << 25,
-            dlChunkSize: 1024 * 1024 * 4, // 4MB chunks
-            requestOptions: {
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-                }
-            }
+        // Configuración de play-dl optimizada para mejor rendimiento
+        playDlOptions: {
+            quality: 2, // 0 = más alta, 1 = alta, 2 = baja (mejor para bots)
+            seek: 0,
+            discordPlayerCompatibility: true // Optimizado para Discord
         },
+        
+        // Configuración de AudioResource
+        resourceOptions: {
+            inputType: 'arbitrary', // Permite diferentes tipos de input
+            inlineVolume: true,
+            silencePaddingFrames: 5 // Reducir padding para menos latencia
+        },
+        
+        // Configuración de volumen
+        defaultVolume: 0.3, // Volumen por defecto más bajo para evitar distorsión
         
         // Configuración de búsqueda
         searchLimit: 1,
@@ -45,9 +49,15 @@ const config = {
         // Configuración de cola
         maxQueueSize: 100,
         
+        // Configuración de reproductor
+        maxMissedFrames: 5, // Reducir frames perdidos permitidos
+        
         // Configuración de reintentos
         maxRetries: 3,
-        retryDelay: 1000
+        retryDelay: 1000,
+        
+        // Configuración de timeout para streams
+        streamTimeout: 5000 // 5 segundos para evitar bloqueos
     },
     
     // Configuración de Spotify

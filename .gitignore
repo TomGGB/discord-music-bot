@@ -34,3 +34,13 @@ Desktop.ini
 ffmpeg/
 temp/
 downloads/
+
+# Archivos temporales HTML
+*.html
+1752559*-watch.html
+
+# Archivos de prueba temporales
+test-*.js
+
+# Archivos de configuración local
+server-config.json
