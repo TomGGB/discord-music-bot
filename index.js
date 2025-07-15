@@ -2665,15 +2665,22 @@ app.listen(PORT, '0.0.0.0', () => {
 // Función para crear stream con youtube-dl-exec como fallback
 async function createStreamWithYtdlCore(url) {
     try {
-        console.log('🔧 Intentando crear stream con ytdl-core como método principal...');
+        console.log('🔧 Intentando crear stream con ytdl-core con User-Agent personalizado...');
 
         // Verificar si la URL es válida
         if (!ytdl.validateURL(url)) {
             throw new Error('URL de YouTube inválida');
         }
 
+        // Configurar opciones de solicitud con User-Agent personalizado
+        const requestOptions = {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+        };
+
         // Obtener información básica del video
-        const info = await ytdl.getInfo(url);
+        const info = await ytdl.getInfo(url, { requestOptions });
         console.log(`✅ Información obtenida para: ${info.videoDetails.title}`);
 
         // Crear un PassThrough para mayor estabilidad
@@ -2686,7 +2693,8 @@ async function createStreamWithYtdlCore(url) {
         const stream = ytdl.downloadFromInfo(info, {
             filter: 'audioonly',
             quality: 'highestaudio',
-            highWaterMark: 1 << 25
+            highWaterMark: 1 << 25,
+            requestOptions
         });
 
         // Conectar el stream al PassThrough
