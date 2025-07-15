@@ -10,6 +10,9 @@
     "direct": "node index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "engines": {
+    "node": ">=16.0.0"
+  },
   "keywords": [
     "discord",
     "music",

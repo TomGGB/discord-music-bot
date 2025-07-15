@@ -906,7 +906,13 @@ client.on('interactionCreate', async (interaction) => {
     }
 });
 
-// Iniciar el bot
+// Mantener el bot activo en producción (para Render/Heroku)
+if (process.env.NODE_ENV === 'production') {
+    require('./keep-alive');
+    console.log('🌐 Keep-alive server iniciado para producción');
+}
+
+// Iniciar sesión del bot
 client.login(process.env.DISCORD_TOKEN);
 
 // Función para procesar álbum de Spotify
