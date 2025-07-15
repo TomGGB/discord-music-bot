@@ -1,0 +1,26 @@
+// Script para obtener la clave pública de Discord
+console.log('🔑 OBTENER CLAVE PÚBLICA DE DISCORD');
+console.log('=====================================');
+console.log('');
+console.log('1. Ve a: https://discord.com/developers/applications/1394437291115548822/information');
+console.log('2. En la sección "General Information"');
+console.log('3. Busca "Public Key"');
+console.log('4. Copia el valor (es un string hexadecimal largo)');
+console.log('');
+console.log('5. En Render Dashboard:');
+console.log('   - Ve a Environment Variables');
+console.log('   - Agrega: DISCORD_PUBLIC_KEY');
+console.log('   - Valor: [la clave pública copiada]');
+console.log('');
+console.log('⚠️  IMPORTANTE:');
+console.log('   - La clave pública es diferente al token del bot');
+console.log('   - Es necesaria para verificar firmas de Discord');
+console.log('   - Sin ella, Discord no puede verificar el endpoint');
+console.log('');
+console.log('✅ Una vez configurada, el endpoint podrá:');
+console.log('   - Verificar firmas de Discord correctamente');
+console.log('   - Pasar la validación del Developer Portal');
+console.log('   - Recibir comandos slash via HTTP');
+console.log('');
+console.log('🔗 Endpoint actual: https://lanamusic.onrender.com/interactions');
+console.log('🔗 Diagnóstico: https://lanamusic.onrender.com/diagnose');

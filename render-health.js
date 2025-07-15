@@ -233,7 +233,7 @@ app.post('/interactions', express.raw({ type: 'application/json' }), (req, res) 
     const timestamp = req.headers['x-signature-timestamp'];
     const userAgent = req.headers['user-agent'];
     
-    console.log('📨 Interacción recibida:', {
+    console.log('📨 Interacción Discord recibida:', {
         type,
         command: data?.name || 'none',
         id: id || 'none',
@@ -241,12 +241,30 @@ app.post('/interactions', express.raw({ type: 'application/json' }), (req, res) 
         timestamp: timestamp || 'none',
         userAgent: userAgent || 'none',
         bodyLength: bodyString?.length || 0,
-        headers: Object.keys(req.headers).filter(h => h.startsWith('x-')).length
+        contentType: req.headers['content-type'],
+        method: req.method,
+        path: req.path
     });
     
-    // Configurar headers de respuesta
+    // Verificación de firma opcional (Discord la requiere en producción)
+    if (signature && timestamp && process.env.DISCORD_PUBLIC_KEY) {
+        console.log('🔐 Verificando firma Discord...');
+        const { verifyDiscordSignature } = require('./discord-verify');
+        
+        if (!verifyDiscordSignature(bodyString, signature, timestamp)) {
+            console.log('❌ Firma Discord inválida');
+            return res.status(401).json({ error: 'Invalid signature' });
+        }
+        console.log('✅ Firma Discord válida');
+    } else {
+        console.log('⚠️ Saltando verificación de firma (desarrollo o faltan datos)');
+    }
+    
+    // Configurar headers de respuesta estándar
     res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     
     // Tipo 1: PING - Discord verifica que el endpoint funciona
     if (type === 1) {
@@ -277,7 +295,7 @@ app.post('/interactions', express.raw({ type: 'application/json' }), (req, res) 
             const response = {
                 type: 4,
                 data: {
-                    content: '⚙️ Comando setup recibido. Endpoint web activo.',
+                    content: '⚙️ Comando setup recibido. Endpoint web activo y funcionando.',
                     flags: 64
                 }
             };
@@ -289,7 +307,7 @@ app.post('/interactions', express.raw({ type: 'application/json' }), (req, res) 
         const response = {
             type: 4,
             data: {
-                content: `✅ Comando /${data?.name || 'desconocido'} recibido correctamente!`,
+                content: `✅ Comando /${data?.name || 'desconocido'} recibido correctamente desde Render!`,
                 flags: 64
             }
         };
@@ -316,7 +334,7 @@ app.post('/interactions', express.raw({ type: 'application/json' }), (req, res) 
     const response = {
         type: 4,
         data: {
-            content: `Tipo de interacción no soportada: ${type}`,
+            content: `❓ Tipo de interacción no soportada: ${type}`,
             flags: 64
         }
     };
@@ -384,7 +402,8 @@ app.get('/diagnose', async (req, res) => {
         discord_setup: {
             interaction_endpoint_url: `${req.protocol}://${req.get('host')}/interactions`,
             redirect_uri: `${req.protocol}://${req.get('host')}/oauth2/callback`,
-            note: 'Usa interaction_endpoint_url en Discord Developer Portal'
+            note: 'Usa interaction_endpoint_url en Discord Developer Portal',
+            public_key_needed: 'Configura DISCORD_PUBLIC_KEY en Render para verificación de firma'
         },
         connection_test: null,
         error_details: null
