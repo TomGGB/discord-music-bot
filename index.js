@@ -74,34 +74,21 @@ const client = new Client({
             $os: 'linux'
         },
         // Configuraciones críticas para Render
-        family: 'ipv4',
-        localAddress: undefined,
-        handshakeTimeout: 45000,  // Aumentado significativamente
-        closeTimeout: 45000,      // Aumentado significativamente
-        // Configuraciones de WebSocket para entornos restrictivos
-        perMessageDeflate: false,
-        threshold: 1024,
-        concurrency: 1,
-        maxPayload: 1048576
+        handshakeTimeout: 45000,
+        closeTimeout: 45000
     },
     rest: {
-        timeout: 45000,           // Aumentado significativamente
-        retries: 5,               // Más reintentos
+        timeout: 45000,
+        retries: 5,
         rejectOnRateLimit: false,
         userAgentSuffix: ['LanaMusic-Bot-Render/1.0'],
-        // Configuraciones específicas para Render
         api: 'https://discord.com/api',
-        version: '10',
-        // Headers específicos para entornos de hosting
-        headers: {
-            'User-Agent': 'DiscordBot (https://github.com/TomGGB/discord-music-bot, 1.0.0)',
-            'X-RateLimit-Precision': 'millisecond'
-        }
+        version: '10'
     },
     // Configuraciones adicionales para entornos restrictivos
     restRequestTimeout: 45000,
-    restSweepInterval: 300,      // Menos frecuente
-    restTimeOffset: 1000,        // Más tiempo de offset
+    restSweepInterval: 300,
+    restTimeOffset: 1000,
     restGlobalTimeout: 45000,
     // Configuraciones de conexión específicas para Render
     shards: 'auto',
@@ -112,11 +99,7 @@ const client = new Client({
         ChannelManager: 50,
         GuildManager: 50,
         UserManager: 50,
-        GuildMemberManager: 50,
-        ThreadManager: 50,
-        ReactionManager: 50,
-        GuildEmojiManager: 50,
-        VoiceStateManager: 50
+        GuildMemberManager: 50
     }),
     // Configuración de presence simple
     presence: {
@@ -125,16 +108,7 @@ const client = new Client({
             name: 'música en Render 🎵',
             type: 2
         }]
-    },
-    // Configuraciones críticas para Render
-    allowedMentions: {
-        parse: ['users', 'roles'],
-        repliedUser: true
-    },
-    partials: [],
-    // Configuraciones de conexión específicas para hosting
-    failIfNotExists: false,
-    jsonTransformer: undefined
+    }
 });
 
 // Configuración de Spotify
@@ -1127,16 +1101,6 @@ setTimeout(() => {
 
 // Configuración específica para Render si está disponible
 if (process.env.NODE_ENV === 'production') {
-    // Configuraciones de red específicas para Render
-    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'; // Solo para debugging
-    
-    // Configurar proxy si está disponible
-    const proxyUrl = process.env.HTTP_PROXY || process.env.HTTPS_PROXY || process.env.http_proxy || process.env.https_proxy;
-    if (proxyUrl) {
-        console.log('🔗 Configurando proxy para Render:', proxyUrl);
-        client.rest.setProxy(proxyUrl);
-    }
-    
     console.log('🔧 Configuraciones de Render aplicadas');
 }
 
