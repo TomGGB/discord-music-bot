@@ -9,6 +9,7 @@
     "dev": "node start.js",
     "setup": "node setup.js",
     "direct": "node index.js",
+    "verify": "node verify-bot.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "engines": {
