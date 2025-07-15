@@ -30,14 +30,24 @@ const config = {
         ytdlOptions: {
             filter: 'audioonly',
             quality: 'highestaudio',
-            highWaterMark: 1 << 25
+            highWaterMark: 1 << 25,
+            dlChunkSize: 1024 * 1024 * 4, // 4MB chunks
+            requestOptions: {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                }
+            }
         },
         
         // Configuración de búsqueda
         searchLimit: 1,
         
         // Configuración de cola
-        maxQueueSize: 100
+        maxQueueSize: 100,
+        
+        // Configuración de reintentos
+        maxRetries: 3,
+        retryDelay: 1000
     },
     
     // Configuración de Spotify
@@ -47,6 +57,22 @@ const config = {
         
         // Límite de búsqueda
         searchLimit: 1
+    },
+    
+    // Configuración del modo radio
+    radio: {
+        enabled: true,
+        minQueueSize: 2, // Activar radio cuando queden menos de 2 canciones
+        maxSuggestions: 5, // Máximo de sugerencias a agregar por vez
+        searchTerms: [
+            'official music video',
+            'official audio',
+            'remix',
+            'cover',
+            'acoustic',
+            'live',
+            'session'
+        ]
     },
     
     // Mensajes del bot
@@ -60,7 +86,9 @@ const config = {
         spotifyTokenObtained: 'Token de Spotify obtenido correctamente',
         spotifyTokenError: 'Error al obtener token de Spotify:',
         musicChannelConfigured: 'Canal de música configurado:',
-        queueFull: 'La cola está llena. Máximo de canciones permitidas:'
+        queueFull: 'La cola está llena. Máximo de canciones permitidas:',
+        radioEnabled: '🔀 Modo radio activado - Reproduciendo música similar...',
+        radioDisabled: '📻 Modo radio desactivado'
     }
 };
 
