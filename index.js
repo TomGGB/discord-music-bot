@@ -970,13 +970,6 @@ client.on('interactionCreate', async (interaction) => {
 
 // Función para registrar comandos slash
 async function registerSlashCommands() {
-    // Verificar que el cliente esté listo
-    if (!client.user || !client.user.id) {
-        console.log('⚠️ Cliente no está listo, reintentando en 2 segundos...');
-        setTimeout(registerSlashCommands, 2000);
-        return;
-    }
-
     const commands = [
         {
             name: 'setup',
@@ -1020,17 +1013,7 @@ async function registerSlashCommands() {
     } catch (error) {
         console.error('❌ Error al registrar comandos slash:', error);
         console.error('🔍 Detalles del error:', error.message);
-        
-        // Reintentar en 5 segundos
-        console.log('🔄 Reintentando en 5 segundos...');
-        setTimeout(registerSlashCommands, 5000);
     }
-}
-
-// Mantener el bot activo en producción (para Render/Heroku)
-if (process.env.NODE_ENV === 'production') {
-    require('./keep-alive');
-    console.log('🌐 Keep-alive server iniciado para producción');
 }
 
 // Iniciar sesión del bot
@@ -1040,12 +1023,29 @@ if (!process.env.DISCORD_TOKEN) {
     process.exit(1);
 }
 
+console.log('🔐 Token configurado, intentando conectar...');
+
+// Timeout para el evento ready
+setTimeout(() => {
+    if (!client.user) {
+        console.error('❌ Timeout: El bot no se conectó en 30 segundos');
+        process.exit(1);
+    }
+}, 30000);
+
 client.login(process.env.DISCORD_TOKEN)
     .then(() => {
         console.log('✅ Sesión iniciada correctamente');
+        
+        // Mantener el bot activo en producción (después del login)
+        if (process.env.NODE_ENV === 'production') {
+            require('./keep-alive');
+            console.log('🌐 Keep-alive server iniciado para producción');
+        }
     })
     .catch(error => {
         console.error('❌ Error al iniciar sesión:', error.message);
+        console.error('🔍 Detalles del error:', error);
         process.exit(1);
     });
 
