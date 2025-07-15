@@ -3,7 +3,34 @@
 const fs = require('fs');
 const path = require('path');
 
-// Verificar archivo .env
+// En producción, usar variables de entorno del sistema
+if (process.env.NODE_ENV === 'production') {
+    console.log('🌐 Modo producción detectado - usando variables de entorno del sistema');
+    
+    // Verificar variables requeridas en producción
+    const requiredVars = ['DISCORD_TOKEN'];
+    const missingVars = [];
+
+    for (const varName of requiredVars) {
+        if (!process.env[varName]) {
+            missingVars.push(varName);
+        }
+    }
+
+    if (missingVars.length > 0) {
+        console.log('❌ Error: Faltan variables de entorno en producción:');
+        missingVars.forEach(varName => {
+            console.log(`   - ${varName}`);
+        });
+        process.exit(1);
+    }
+    
+    // Iniciar directamente en producción
+    startBot();
+    return;
+}
+
+// Verificar archivo .env (solo en desarrollo)
 const envPath = path.join(__dirname, '.env');
 if (!fs.existsSync(envPath)) {
     console.log('❌ Error: No se encontró el archivo .env');
