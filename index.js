@@ -808,6 +808,9 @@ client.on('ready', async () => {
     console.log(`${config.messages.botConnected} ${client.user.tag}`);
     console.log('🎮 Bot listo y conectado a Discord');
     
+    // Registrar comandos slash
+    await registerSlashCommands();
+    
     // Obtener token de Spotify
     await getSpotifyToken();
     
@@ -863,6 +866,8 @@ client.on('messageReactionAdd', async (reaction, user) => {
 
 // Evento para manejar comandos de aplicación (slash commands)
 client.on('interactionCreate', async (interaction) => {
+    console.log('🔧 Comando recibido:', interaction.commandName);
+    
     if (!interaction.isChatInputCommand()) return;
     
     if (interaction.commandName === 'setup') {
@@ -929,6 +934,41 @@ client.on('interactionCreate', async (interaction) => {
         }
     }
 });
+
+// Función para registrar comandos slash
+async function registerSlashCommands() {
+    const commands = [
+        {
+            name: 'setup',
+            description: 'Configura el canal de música del bot',
+            options: [
+                {
+                    name: 'canal',
+                    description: 'Canal donde el bot recibirá las canciones',
+                    type: 7, // CHANNEL type
+                    required: true,
+                    channel_types: [0] // TEXT channel only
+                }
+            ]
+        }
+    ];
+
+    const { REST, Routes } = require('discord.js');
+    const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
+
+    try {
+        console.log('🔧 Registrando comandos slash...');
+        
+        await rest.put(
+            Routes.applicationCommands(client.user.id),
+            { body: commands }
+        );
+        
+        console.log('✅ Comandos slash registrados exitosamente');
+    } catch (error) {
+        console.error('❌ Error al registrar comandos slash:', error);
+    }
+}
 
 // Mantener el bot activo en producción (para Render/Heroku)
 if (process.env.NODE_ENV === 'production') {
@@ -2179,3 +2219,6 @@ async function activateRadioMode(voiceChannel, textChannel) {
         }
     }
 }
+
+// Registrar comandos slash al iniciar el bot
+registerSlashCommands();
