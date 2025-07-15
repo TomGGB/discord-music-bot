@@ -73,6 +73,35 @@ app.get('/ping', (req, res) => {
     });
 });
 
+// Endpoint OAuth2 callback (requerido por Discord)
+app.get('/oauth2/callback', (req, res) => {
+    const { code, state } = req.query;
+    
+    res.json({
+        message: 'OAuth2 callback received',
+        code: code ? 'received' : 'missing',
+        state: state || 'none',
+        timestamp: new Date().toISOString()
+    });
+});
+
+// Endpoints opcionales para términos y privacidad
+app.get('/terms', (req, res) => {
+    res.send(`
+        <h1>Términos de Servicio - LanaMusic Bot</h1>
+        <p>Este bot de música está destinado solo para uso personal y educativo.</p>
+        <p>Última actualización: ${new Date().toLocaleDateString()}</p>
+    `);
+});
+
+app.get('/privacy', (req, res) => {
+    res.send(`
+        <h1>Política de Privacidad - LanaMusic Bot</h1>
+        <p>Este bot no recopila datos personales de los usuarios.</p>
+        <p>Última actualización: ${new Date().toLocaleDateString()}</p>
+    `);
+});
+
 // Endpoint para diagnosticar problemas de conexión
 app.get('/diagnose', async (req, res) => {
     const diagnosis = {
