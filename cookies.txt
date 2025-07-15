@@ -1,0 +1,21 @@
+# Netscape HTTP Cookie File
+# This file was generated manually for use with ytdl-core.
+# Example format:
+# domain    flag    path    secure  expiration  name    value
+.youtube.com    FALSE    /    FALSE    1757912860    _gcl_au    1.1.638977626.1750136861
+.youtube.com    TRUE    /    TRUE    1786656344    __Secure-3PSID    g.a000zAhLaDXIXt5RfexZ0GJxTbVPvqJDmt-v2K_y9FeDLVDTgN80mtS53kOXkc5lyuVUqT5ccwACgYKAXwSARcSFQHGX2Mi8OUhFPjbDdWIdMYBBwFjIhoVAUF8yKocPKNZtgb8YjanbM83wtzE0076
+.youtube.com    FALSE    /    FALSE    1784106104    SIDCC    AKEyXzWHJ5RG-Bk4QHL7s26XaYFwbZVOJ5RRDdkax6IoIxs328Xpg8T3vv_e4OdhBo-t4S2y5RY
+.youtube.com    FALSE    /    FALSE    1786656344    SID    g.a000zAhLaDXIXt5RfexZ0GJxTbVPvqJDmt-v2K_y9FeDLVDTgN80qC_z2KU4JqJPOxUO367VYgACgYKAZwSARcSFQHGX2MiIdUne8e3iMfJBdmRGMBCUBoVAUF8yKpaduNNDLaZXARkTzCj3DxJ0076
+.youtube.com    TRUE    /    TRUE    1784105603    __Secure-1PSIDTS    sidts-CjEB5H03PzyNciPOKOibxAfCohQ4H0YnH_7opHNHSUOpZc7dE9ZePVB8Jp8QOiCoQoO6EAA
+.youtube.com    TRUE    /    TRUE    1786656344    SAPISID    HVqQRbBeObvRHZeC/Aff2TsyXVmjVOHwpK
+.youtube.com    TRUE    /    TRUE    1784106104    __Secure-1PSIDCC    AKEyXzX3Eb0xmcXh9hYGAY7EncacOxAl3GTA0m_Wkl-9ru2L6Fg4dL7jVUb37ynitq0PGoRUkg
+.youtube.com    TRUE    /    TRUE    1786656344    SSID    Avr1k8zkMHmXzLiJR
+.youtube.com    TRUE    /    TRUE    1786656344    __Secure-1PAPISID    HVqQRbBeObvRHZeC/Aff2TsyXVmjVOHwpK
+.youtube.com    TRUE    /    TRUE    1786656344    __Secure-1PSID    g.a000zAhLaDXIXt5RfexZ0GJxTbVPvqJDmt-v2K_y9FeDLVDTgN800N9D0NfhRT9LNvKK-cI1bAACgYKAdYSARcSFQHGX2MiD9sYBTYX-DxDKeSl_OSTgRoVAUF8yKpWKNoR_hW7htfsRAHw291k0076
+.youtube.com    TRUE    /    TRUE    1786656344    __Secure-3PAPISID    HVqQRbBeObvRHZeC/Aff2TsyXVmjVOHwpK
+.youtube.com    TRUE    /    TRUE    1784106104    __Secure-3PSIDCC    AKEyXzVBXm7c47uFi5nSlO9eSNqk7HpMnwVwWUUW3zm_rZWYXFFpl_1eZibaXAAHyKmkEzhEA1U
+.youtube.com    TRUE    /    TRUE    1784105603    __Secure-3PSIDTS    sidts-CjEB5H03PzyNciPOKOibxAfCohQ4H0YnH_7opHNHSUOpZc7dE9ZePVB8Jp8QOiCoQoO6EAA
+.youtube.com    FALSE    /    FALSE    1786656344    APISID    gFlhvr_RCI7o86l-/AvTXy1E30e9KT6dTF
+.youtube.com    FALSE    /    FALSE    1786656344    HSID    AxfGHGIcGaFDZDCak
+.youtube.com    TRUE    /    TRUE    1784696860    LOGIN_INFO    AFmmF2swRgIhAPFwTD7p24hjDKepovs3NlFhApQ0JqxCduRD1t9_aa2wAiEAwsEOJn5k8ZXxB2GJNEtv8FhQ-eYlGTcZhzR8KTtMZ9w:QUQ3MjNmeWc0STNxV2VYaFZ5V0lDNGg1dEpRLWNnMHhRMXlBckJEVHRCQks2cUxqY1k1QnM5ZEk0NHc1bUhiMlpyRUhXMjMzbExPMnMxS1JndW5oaTV5cHhSZF9yWm5XSmZUYmRaM2tMb3djZHlIVmtqNERfUm1TMXktdkFBYmJ0QlAzbTcwRVJEQTdlRHRNdkdPc2MtU0NQeU9oTGVqWm5B
+.youtube.com    TRUE    /    TRUE    1787113407    PREF    f6=40000080&repeat=NONE&tz=America.Santiago&f5=30000&f7=140
