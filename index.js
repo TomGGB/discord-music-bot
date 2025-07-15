@@ -869,18 +869,34 @@ client.on('messageReactionAdd', async (reaction, user) => {
 
 // Evento para manejar comandos de aplicación (slash commands)
 client.on('interactionCreate', async (interaction) => {
-    console.log('🔧 Comando recibido:', interaction.commandName);
+    console.log('🔧 Interacción recibida:', {
+        type: interaction.type,
+        commandName: interaction.commandName,
+        user: interaction.user.tag,
+        guild: interaction.guild?.name || 'DM'
+    });
     
-    if (!interaction.isChatInputCommand()) return;
+    if (!interaction.isChatInputCommand()) {
+        console.log('⚠️ No es un comando de chat input');
+        return;
+    }
     
     if (interaction.commandName === 'setup') {
+        console.log('✅ Comando /setup recibido');
         const channel = interaction.options.getChannel('canal');
+        console.log('📋 Canal seleccionado:', channel?.name);
         
         // Responder inmediatamente para evitar timeout
-        await interaction.reply({
-            content: '⏳ Configurando canal de música...',
-            flags: 64 // Ephemeral flag
-        });
+        try {
+            await interaction.reply({
+                content: '⏳ Configurando canal de música...',
+                ephemeral: true
+            });
+            console.log('✅ Respuesta inicial enviada');
+        } catch (error) {
+            console.error('❌ Error al enviar respuesta inicial:', error);
+            return;
+        }
         
         try {
             // Verificar que el usuario tenga permisos de administrador
@@ -913,9 +929,11 @@ client.on('interactionCreate', async (interaction) => {
             // Configurar el canal de música
             setMusicChannel(interaction.guild.id, channel.id);
             botState.musicChannels.set(interaction.guild.id, channel);
+            console.log('✅ Canal configurado:', channel.name);
             
             // Crear el panel de control en el nuevo canal
             await createControlPanel(interaction.guild.id);
+            console.log('✅ Panel de control creado');
             
             await interaction.editReply({
                 content: `✅ Canal de música configurado correctamente en ${channel}.\n\n` +
@@ -925,16 +943,28 @@ client.on('interactionCreate', async (interaction) => {
                          `• Todos los mensajes se eliminarán automáticamente para mantener el canal limpio`
             });
             
+            console.log('✅ Configuración completada exitosamente');
+            
         } catch (error) {
-            console.error('Error en comando /setup:', error);
+            console.error('❌ Error en comando /setup:', error);
+            console.error('🔍 Stack trace:', error.stack);
             try {
                 await interaction.editReply({
                     content: '❌ Ocurrió un error al configurar el canal. Inténtalo de nuevo.'
                 });
             } catch (editError) {
-                console.error('Error al editar respuesta:', editError);
+                console.error('❌ Error al editar respuesta:', editError);
             }
         }
+    }
+    
+    // Comando de prueba
+    if (interaction.commandName === 'ping') {
+        console.log('✅ Comando /ping recibido');
+        await interaction.reply({
+            content: '🏓 ¡Pong! El bot está funcionando correctamente.',
+            ephemeral: true
+        });
     }
 });
 
@@ -942,7 +972,8 @@ client.on('interactionCreate', async (interaction) => {
 async function registerSlashCommands() {
     // Verificar que el cliente esté listo
     if (!client.user || !client.user.id) {
-        console.log('⚠️ Cliente no está listo, esperando...');
+        console.log('⚠️ Cliente no está listo, reintentando en 2 segundos...');
+        setTimeout(registerSlashCommands, 2000);
         return;
     }
 
@@ -959,6 +990,10 @@ async function registerSlashCommands() {
                     channel_types: [0] // TEXT channel only
                 }
             ]
+        },
+        {
+            name: 'ping',
+            description: 'Verifica que el bot esté funcionando'
         }
     ];
 
@@ -968,15 +1003,27 @@ async function registerSlashCommands() {
     try {
         console.log('🔧 Registrando comandos slash...');
         console.log('📋 Cliente ID:', client.user.id);
+        console.log('🎮 Usuario del bot:', client.user.tag);
         
+        // Intentar registrar tanto globalmente como localmente
         await rest.put(
             Routes.applicationCommands(client.user.id),
             { body: commands }
         );
         
         console.log('✅ Comandos slash registrados exitosamente');
+        
+        // Verificar que los comandos se registraron
+        const registeredCommands = await rest.get(Routes.applicationCommands(client.user.id));
+        console.log('📋 Comandos registrados:', registeredCommands.length);
+        
     } catch (error) {
         console.error('❌ Error al registrar comandos slash:', error);
+        console.error('🔍 Detalles del error:', error.message);
+        
+        // Reintentar en 5 segundos
+        console.log('🔄 Reintentando en 5 segundos...');
+        setTimeout(registerSlashCommands, 5000);
     }
 }
 
